@@ -242,6 +242,7 @@ function resetPlayer() {
 }
 
 function setIdle() {
+  if (deathSequenceActive || fatalSequenceActive || entryCutsceneActive) return;
   if (shootingUntil > performance.now()) return;
   if (shieldedUntil > performance.now()) {
     player.classList.add('is-shielded');
