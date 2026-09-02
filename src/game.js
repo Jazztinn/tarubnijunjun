@@ -23,23 +23,23 @@ const ammoPips = [...document.querySelectorAll('.ammo-pip')];
 const heartHud = document.querySelector('#heart-hud');
 const heartNodes = [...heartHud.querySelectorAll('.heart')];
 
-const IDLE_GIF = '/assets/ship-idle.gif';
-const SHIELD_IDLE_GIF = '/assets/ship-idle-shield.gif';
-const SHOOTING_GIF = '/assets/ship-shoot.gif';
-const SHIELD_GIF = '/assets/ship-shield.gif';
-const DEATH_GIF = '/assets/ship-death.gif';
-const DEATH_FRAMES = Array.from({ length: 8 }, (_, index) => `/assets/death-frames/frame-${String(index + 1).padStart(2, '0')}.png`);
-const PROJECTILE_FRAMES = Array.from({ length: 6 }, (_, index) => `/assets/projectile${index + 1}.png`);
-const SHIELD_POWERUP_IMAGE = '/assets/durexnijunjun.png';
-const GROWTH_POWERUP_IMAGE = '/assets/viagranijunjun.png';
-const AMMO_PACK_IMAGE = '/assets/ammopack.png';
+const IDLE_GIF = './assets/ship-idle.gif';
+const SHIELD_IDLE_GIF = './assets/ship-idle-shield.gif';
+const SHOOTING_GIF = './assets/ship-shoot.gif';
+const SHIELD_GIF = './assets/ship-shield.gif';
+const DEATH_GIF = './assets/ship-death.gif';
+const DEATH_FRAMES = Array.from({ length: 8 }, (_, index) => `./assets/death-frames/frame-${String(index + 1).padStart(2, '0')}.png`);
+const PROJECTILE_FRAMES = Array.from({ length: 6 }, (_, index) => `./assets/projectile${index + 1}.png`);
+const SHIELD_POWERUP_IMAGE = './assets/durexnijunjun.png';
+const GROWTH_POWERUP_IMAGE = './assets/viagranijunjun.png';
+const AMMO_PACK_IMAGE = './assets/ammopack.png';
 const ENEMY_ASSETS = [
-  { name: 'knife', behavior: 'knife', src: '/assets/kutsily.png', alphaBounds: [21, 13, 28, 41] },
-  { name: 'arrow', behavior: 'arrow', src: '/assets/arrow.png', alphaBounds: [21, 14, 27, 32] },
-  { name: 'scissor', behavior: 'scissor', src: '/assets/scissor.png', alphaBounds: [20, 12, 28, 35] },
-  { name: 'cannonball', behavior: 'cannonball', src: '/assets/cannonball.png', alphaBounds: [20, 21, 27, 28] },
-  { name: 'axe', behavior: 'axe', src: '/assets/axe.png', alphaBounds: [20, 15, 28, 31] },
-  { name: 'sickle', behavior: 'sickle', src: '/assets/sickle.png', alphaBounds: [16, 15, 28, 31] },
+  { name: 'knife', behavior: 'knife', src: './assets/kutsily.png', alphaBounds: [21, 13, 28, 41] },
+  { name: 'arrow', behavior: 'arrow', src: './assets/arrow.png', alphaBounds: [21, 14, 27, 32] },
+  { name: 'scissor', behavior: 'scissor', src: './assets/scissor.png', alphaBounds: [20, 12, 28, 35] },
+  { name: 'cannonball', behavior: 'cannonball', src: './assets/cannonball.png', alphaBounds: [20, 21, 27, 28] },
+  { name: 'axe', behavior: 'axe', src: './assets/axe.png', alphaBounds: [20, 15, 28, 31] },
+  { name: 'sickle', behavior: 'sickle', src: './assets/sickle.png', alphaBounds: [16, 15, 28, 31] },
 ];
 const SHIP_SIZE = 100;
 const POWERUP_SIZE = 100;
@@ -96,13 +96,13 @@ const ENEMY_BEHAVIORS = {
   sickle: { name: 'sickle', size: 104, baseSpeed: 88, speedScale: .96, health: 1, canStrike: false, trailEnabled: false },
 };
 const CLOUD_TYPES = [
-  { src: '/assets/cloud1.png', width: CLOUD_WIDTH, height: CLOUD_HEIGHT, minSpeed: 82, maxSpeed: 112, maxDrift: 18 },
-  { src: '/assets/cloud2.png', width: CLOUD_WIDTH, height: CLOUD_HEIGHT, minSpeed: 58, maxSpeed: 78, maxDrift: 11 },
-  { src: '/assets/cloud3.png', width: CLOUD_WIDTH, height: CLOUD_HEIGHT, minSpeed: 48, maxSpeed: 68, maxDrift: 8 },
-  { src: '/assets/cloud4.png', width: CLOUD_WIDTH, height: CLOUD_HEIGHT, minSpeed: 72, maxSpeed: 98, maxDrift: 15 },
-  { src: '/assets/cloud5.png', width: CLOUD_WIDTH, height: CLOUD_HEIGHT, minSpeed: 88, maxSpeed: 118, maxDrift: 20 },
-  { src: '/assets/cloud6.png', width: CLOUD_WIDTH, height: CLOUD_HEIGHT, minSpeed: 76, maxSpeed: 104, maxDrift: 17 },
-  { src: '/assets/cloud7.png', width: CLOUD_WIDTH, height: CLOUD_HEIGHT, minSpeed: 52, maxSpeed: 72, maxDrift: 9 },
+  { src: './assets/cloud1.png', width: CLOUD_WIDTH, height: CLOUD_HEIGHT, minSpeed: 82, maxSpeed: 112, maxDrift: 18 },
+  { src: './assets/cloud2.png', width: CLOUD_WIDTH, height: CLOUD_HEIGHT, minSpeed: 58, maxSpeed: 78, maxDrift: 11 },
+  { src: './assets/cloud3.png', width: CLOUD_WIDTH, height: CLOUD_HEIGHT, minSpeed: 48, maxSpeed: 68, maxDrift: 8 },
+  { src: './assets/cloud4.png', width: CLOUD_WIDTH, height: CLOUD_HEIGHT, minSpeed: 72, maxSpeed: 98, maxDrift: 15 },
+  { src: './assets/cloud5.png', width: CLOUD_WIDTH, height: CLOUD_HEIGHT, minSpeed: 88, maxSpeed: 118, maxDrift: 20 },
+  { src: './assets/cloud6.png', width: CLOUD_WIDTH, height: CLOUD_HEIGHT, minSpeed: 76, maxSpeed: 104, maxDrift: 17 },
+  { src: './assets/cloud7.png', width: CLOUD_WIDTH, height: CLOUD_HEIGHT, minSpeed: 52, maxSpeed: 72, maxDrift: 9 },
 ];
 const keys = new Set();
 
@@ -846,7 +846,7 @@ function updateHearts() {
     const full = index < hearts;
     heart.classList.toggle('is-full', full);
     heart.classList.toggle('is-empty', !full);
-    heart.src = full ? '/assets/hud-heart-alive.png' : '/assets/hud-heart-broken.png';
+    heart.src = full ? './assets/hud-heart-alive.png' : './assets/hud-heart-broken.png';
   });
   heartHud.setAttribute('aria-label', `Junjun health: ${hearts} of ${MAX_HEARTS} hearts`);
 }
