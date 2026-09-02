@@ -1,6 +1,6 @@
 @font-face {
   font-family: 'Righteous';
-  src: url('../assets/Righteous.ttf') format('truetype');
+  src: url('../public/assets/Righteous.ttf') format('truetype');
   font-display: swap;
 }
 
@@ -92,9 +92,9 @@ button { font: inherit; }
 .player::after { content: ''; position: absolute; z-index: 2; top: 18px; left: 30px; width: 40px; height: 40px; opacity: 0; background-position: center; background-repeat: no-repeat; background-size: contain; image-rendering: pixelated; pointer-events: none; }
 .powerup-particle-layer { position: absolute; z-index: 3; inset: 0; pointer-events: none; }
 .powerup-particle { position: absolute; top: 0; left: 0; background: #ffffff; image-rendering: pixelated; }
-.player[data-powerup="shield"]::after { background-image: url('../assets/durexnijunjun.png'); }
-.player[data-powerup="growth"]::after { background-image: url('../assets/viagranijunjun.png'); }
-.player[data-powerup="ammo"]::after { background-image: url('../assets/ammopack.png'); }
+.player[data-powerup="shield"]::after { background-image: url('../public/assets/durexnijunjun.png'); }
+.player[data-powerup="growth"]::after { background-image: url('../public/assets/viagranijunjun.png'); }
+.player[data-powerup="ammo"]::after { background-image: url('../public/assets/ammopack.png'); }
 .player.is-powerup-activating::after { animation: powerup-collect .42s steps(5, end) both; }
 .player.is-powerup-switching::after { animation: powerup-switch .42s steps(4, end) both; }
 .ship-slot { width: 100px; height: 100px; }
