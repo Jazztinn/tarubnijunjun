@@ -64,7 +64,8 @@ button { font: inherit; }
 .mission-stat { flex: 1; min-width: 0; padding: 12px 14px; border: 3px solid #ffffff; background: #000000; text-align: left; }
 
 .playfield-wrap { border: 3px solid #ffffff; background: #ffffff; }
-.playfield-heading { display: flex; justify-content: space-between; padding: 13px 16px 12px; color: #000000; border-bottom: 3px solid #ffffff; background: #ffffff; font-size: 9px; letter-spacing: .6px; }
+.playfield-heading { display: flex; justify-content: space-between; padding: 13px 16px 12px; color: #000000; border-bottom: 3px solid #ffffff; background: #ffffff; font-size: 9px; letter-spacing: .6px; visibility: hidden; }
+.playfield-wrap.is-gameplay-ui-visible .playfield-heading { visibility: visible; }
 #wave-progress { min-width: 28px; text-align: right; }
 .playfield.is-wave-complete #wave-label, .playfield.is-wave-complete #wave-progress { animation: wave-complete-flash .3s steps(2, end) infinite; }
 .playfield { position: relative; height: min(145vw, 650px); min-height: 0; overflow: hidden; background: #79c9e1; outline: none; image-rendering: pixelated; }
@@ -73,9 +74,11 @@ button { font: inherit; }
 .game-world.is-impact-shake { animation: impact-shake .14s steps(4, end) both; }
 .game-world.is-entry-launch-shake { animation: entry-launch-shake .15s steps(4, end) both; }
 .clouds { position: absolute; inset: 0; opacity: .9; pointer-events: none; }
+.playfield:not(.is-running) .clouds { visibility: hidden; }
 .clouds-foreground { z-index: 5; }
 .cloud { position: absolute; display: block; width: 180px; height: 90px; object-fit: contain; image-rendering: pixelated; pointer-events: none; }
-.hud-row { position: absolute; z-index: 11; top: var(--hud-inset); right: var(--hud-inset); left: var(--hud-inset); display: flex; min-height: var(--hud-row-height); align-items: center; justify-content: space-between; image-rendering: pixelated; }
+.hud-row { position: absolute; z-index: 11; top: var(--hud-inset); right: var(--hud-inset); left: var(--hud-inset); display: flex; min-height: var(--hud-row-height); align-items: center; justify-content: space-between; visibility: hidden; image-rendering: pixelated; }
+.playfield.is-gameplay-ui-visible .hud-row { visibility: visible; }
 .heart-hud { display: flex; gap: var(--hud-component-gap); align-items: center; image-rendering: pixelated; }
 .health-group { display: flex; gap: var(--hud-icon-gap); width: auto; height: var(--heart-size); }
 .heart-slot { position: relative; display: block; width: var(--heart-slot); height: var(--heart-size); overflow: visible; }
@@ -89,6 +92,7 @@ button { font: inherit; }
 
 .entity-layer, .player { position: absolute; inset: 0; }
 .player { z-index: 4; width: 100px; height: 100px; inset: auto; transform: translate(-50%, -50%); transform-origin: center; transition: transform .12s steps(2, end); pointer-events: none; }
+.playfield:not(.is-running) .player { visibility: hidden; }
 .player::after { content: ''; position: absolute; z-index: 2; top: 18px; left: 30px; width: 40px; height: 40px; opacity: 0; background-position: center; background-repeat: no-repeat; background-size: contain; image-rendering: pixelated; pointer-events: none; }
 .powerup-particle-layer { position: absolute; z-index: 3; inset: 0; pointer-events: none; }
 .powerup-particle { position: absolute; top: 0; left: 0; background: #ffffff; image-rendering: pixelated; }
@@ -99,6 +103,14 @@ button { font: inherit; }
 .player.is-powerup-switching::after { animation: powerup-switch .42s steps(4, end) both; }
 .ship-slot { width: 100px; height: 100px; }
 .ship-sprite { display: block; width: 100px; height: 100px; object-fit: contain; image-rendering: pixelated; }
+.player.is-entry-preintro,
+.player.is-entry-preintro .ship-slot,
+.player.is-entry-preintro .ship-sprite {
+  width: var(--entry-preintro-size, 120px);
+  height: var(--entry-preintro-size, 120px);
+}
+.entry-scene { position: absolute; z-index: 2; display: block; width: var(--entry-preintro-size, 120px); height: var(--entry-preintro-size, 120px); transform: translate(-50%, -50%); object-fit: contain; image-rendering: pixelated; pointer-events: none; }
+.player.is-entry-preintro .ship-sprite { visibility: hidden; }
 .player.is-death-flash .ship-sprite { filter: brightness(0) saturate(100%) invert(19%) sepia(98%) saturate(4318%) hue-rotate(348deg) brightness(106%) contrast(117%); }
 .player.is-bam { animation: death-bam .12s steps(2, end) both; }
 .player.is-hurt .ship-sprite { animation: hurt-flash .32s steps(4, end) both; }

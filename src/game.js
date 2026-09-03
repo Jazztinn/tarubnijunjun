@@ -1,6 +1,8 @@
 const playfield = document.querySelector('#playfield');
+const playfieldWrap = document.querySelector('.playfield-wrap');
 const gameWorld = document.querySelector('#game-world');
 const player = document.querySelector('#player');
+const entryScene = document.querySelector('#entry-scene');
 const cloudLayer = document.querySelector('.clouds');
 const foregroundCloudLayer = document.querySelector('.clouds-foreground');
 const shipSprite = document.querySelector('#ship-sprite');
@@ -30,6 +32,8 @@ const SHIELD_GIF = './public/assets/ship-shield.gif';
 const DEATH_GIF = './public/assets/ship-death.gif';
 const DEATH_FRAMES = Array.from({ length: 8 }, (_, index) => `./public/assets/death-frames/frame-${String(index + 1).padStart(2, '0')}.png`);
 const PROJECTILE_FRAMES = Array.from({ length: 6 }, (_, index) => `./public/assets/projectile${index + 1}.png`);
+const ENTRY_PREINTRO_GIF = './public/assets/nagalulusijunjun.gif';
+const ENTRY_TRANSITION_FRAME = './public/assets/nagalulusijunjunlastframenotarub.gif';
 const SHIELD_POWERUP_IMAGE = './public/assets/durexnijunjun.png';
 const GROWTH_POWERUP_IMAGE = './public/assets/viagranijunjun.png';
 const AMMO_PACK_IMAGE = './public/assets/ammopack.png';
@@ -74,8 +78,35 @@ const FATAL_DASH_MS = 85;
 const FATAL_PRE_IMPACT_GAP_PX = 8;
 const FATAL_RISE_PX = 96;
 const FATAL_EXTRA_RISE_PX = 14;
+const SICKLE_BURST_CYCLE_MS = 1250;
+const SICKLE_BURST_MS = 420;
+const SICKLE_SWIPE_ANGLE = 132;
 const WAVE_KILL_TARGET = 5;
 const ENTRY_WAIT_MS = 600;
+const ENTRY_PREINTRO_MS = 5000;
+const GAMEPLAY_JUNJUN_CANVAS_SIZE = 50;
+const GAMEPLAY_JUNJUN_VISIBLE_BOUNDS = { x: 13, y: 8, width: 22, height: 34 };
+const PREINTRO_SCENE_CANVAS_SIZE = 200;
+// Measured around the small Junjun inside the pre-intro frame, excluding Tarub.
+const PREINTRO_JUNJUN_VISIBLE_BOUNDS = { x: 88, y: 119, width: 22, height: 34 };
+const PREINTRO_TARUB_VISIBLE_BOUNDS = { y: 45, height: 155 };
+const ENTRY_PREINTRO_SIZE = Math.round(Math.max(
+  SHIP_SIZE * (GAMEPLAY_JUNJUN_VISIBLE_BOUNDS.width / GAMEPLAY_JUNJUN_CANVAS_SIZE)
+    / (PREINTRO_JUNJUN_VISIBLE_BOUNDS.width / PREINTRO_SCENE_CANVAS_SIZE),
+  SHIP_SIZE * (GAMEPLAY_JUNJUN_VISIBLE_BOUNDS.height / GAMEPLAY_JUNJUN_CANVAS_SIZE)
+    / (PREINTRO_JUNJUN_VISIBLE_BOUNDS.height / PREINTRO_SCENE_CANVAS_SIZE),
+));
+const ENTRY_PREINTRO_JUNJUN_CENTER_OFFSET_Y = Math.round(
+  (PREINTRO_JUNJUN_VISIBLE_BOUNDS.y + PREINTRO_JUNJUN_VISIBLE_BOUNDS.height / 2 - PREINTRO_SCENE_CANVAS_SIZE / 2)
+    * (ENTRY_PREINTRO_SIZE / PREINTRO_SCENE_CANVAS_SIZE)
+  - (GAMEPLAY_JUNJUN_VISIBLE_BOUNDS.y + GAMEPLAY_JUNJUN_VISIBLE_BOUNDS.height / 2 - GAMEPLAY_JUNJUN_CANVAS_SIZE / 2)
+    * (SHIP_SIZE / GAMEPLAY_JUNJUN_CANVAS_SIZE),
+);
+const ENTRY_PREINTRO_CAMERA_START_Y = 40;
+const ENTRY_PREINTRO_CAMERA_REVEAL_DELAY_MS = 220;
+const ENTRY_PREINTRO_CAMERA_INITIAL_REVEAL_MS = 320;
+// The reference composition keeps Tarub's visible top below the viewport center.
+const PREINTRO_TARUB_TARGET_TOP_RATIO = .56;
 const ENTRY_ROCKET_MS = 360;
 const ENTRY_OVERSHOOT_HOLD_MS = 450;
 const ENTRY_DRIFT_MS = 700;
@@ -87,6 +118,10 @@ const ENTRY_SETTLE_MS = 250;
 const ENTRY_SETTLE_HOLD_MS = 300;
 const CLOUD_WIDTH = 180;
 const CLOUD_HEIGHT = 90;
+const CLOUD_SETTLE_DURATION_MS = 720;
+const CLOUD_SETTLE_STAGGER_MS = 12;
+const CLOUD_SETTLE_LEAD_MS = 1000;
+const ENTRY_FINALIZATION_MS = ENTRY_CORRECTION_UP_MS + ENTRY_TINY_PAUSE_MS + ENTRY_CORRECTION_DOWN_MS + ENTRY_SETTLE_MS + ENTRY_SETTLE_HOLD_MS;
 const ENEMY_BEHAVIORS = {
   scissor: { name: 'scissor', size: 92, baseSpeed: 178, speedScale: 1.05, health: 1, canStrike: false },
   knife: { name: 'knife', size: 78, baseSpeed: 98, speedScale: 1, health: 1, canStrike: true, attackDistance: 190, telegraphScale: .9, strikeScale: .76, recoveryScale: .84 },
@@ -165,9 +200,25 @@ function applyCloudDepth(cloud) {
   cloud.node.style.height = `${cloud.height}px`;
 }
 
-function createClouds() {
+function clearClouds() {
   cloudLayer.replaceChildren();
   foregroundCloudLayer.replaceChildren();
+  clouds = [];
+}
+
+function renderCloud(cloud) {
+  cloud.node.style.transform = `translate(${Math.round(cloud.x)}px, ${Math.round(cloud.y)}px) scaleX(${cloud.flipped ? -1 : 1})`;
+}
+
+function createClouds(now = performance.now()) {
+  clearClouds();
+  const cloudSlots = [
+    [0.04, 0.08], [0.37, 0.04], [0.71, 0.1],
+    [0.15, 0.28], [0.52, 0.23], [0.86, 0.32],
+    [0.02, 0.48], [0.38, 0.44], [0.7, 0.52],
+    [0.2, 0.68], [0.55, 0.74], [0.88, 0.66],
+    [0.43, 0.91],
+  ];
   clouds = Array.from({ length: 13 }, (_, index) => {
     const type = CLOUD_TYPES[index % CLOUD_TYPES.length];
     const foreground = index % 5 === 0;
@@ -179,17 +230,46 @@ function createClouds() {
     cloud.node.width = type.width;
     cloud.node.height = type.height;
     applyCloudDepth(cloud);
-    cloud.x = randomBetween(0, Math.max(0, playfield.clientWidth - cloud.width));
-    cloud.y = randomBetween(-cloud.height, playfield.clientHeight);
+    const [slotX, slotY] = cloudSlots[index];
+    const maxX = Math.max(0, playfield.clientWidth - cloud.width);
+    const maxY = Math.max(0, playfield.clientHeight - cloud.height);
+    const targetX = Math.max(0, Math.min(maxX, maxX * slotX + randomBetween(-14, 14)));
+    const targetY = Math.max(0, Math.min(maxY, maxY * slotY + randomBetween(-12, 12)));
+    cloud.targetX = targetX;
+    cloud.targetY = targetY;
+    cloud.entryStartedAt = now;
+    cloud.entryDelayMs = index * CLOUD_SETTLE_STAGGER_MS;
+    // Start close to the final composition so the adjustment reads as background drift.
+    cloud.entryStartX = targetX + randomBetween(-28, 28);
+    cloud.entryStartY = targetY + randomBetween(-18, 18);
+    cloud.settleSpeedScale = .35;
+    cloud.x = cloud.entryStartX;
+    cloud.y = cloud.entryStartY;
     (foreground ? foregroundCloudLayer : cloudLayer).append(cloud.node);
+    renderCloud(cloud);
     return cloud;
   });
 }
 
-function updateClouds(delta) {
+function updateClouds(delta, now = performance.now()) {
   const height = playfield.clientHeight;
   clouds.forEach((cloud) => {
-    cloud.y += cloud.speed * delta;
+    if (cloud.entryStartedAt !== null) {
+      const entryProgress = Math.max(0, Math.min(1, (now - cloud.entryStartedAt - cloud.entryDelayMs) / CLOUD_SETTLE_DURATION_MS));
+      const entryEase = easeEntry(entryProgress);
+      cloud.x = cloud.entryStartX + (cloud.targetX - cloud.entryStartX) * entryEase;
+      cloud.y = cloud.entryStartY + (cloud.targetY - cloud.entryStartY) * entryEase;
+      if (entryProgress >= 1) {
+        cloud.x = cloud.targetX;
+        cloud.y = cloud.targetY;
+        cloud.entryStartedAt = null;
+        cloud.settleSpeedScale = 1;
+      }
+      cloud.settleSpeedScale = cloud.entryStartedAt === null ? 1 : .35 + entryEase * .65;
+      renderCloud(cloud);
+      if (cloud.entryStartedAt !== null) return;
+    }
+    cloud.y += cloud.speed * delta * (cloud.settleSpeedScale || 1);
     cloud.x += cloud.vx * delta;
     if (cloud.y > height + cloud.height) {
       applyCloudDepth(cloud);
@@ -198,7 +278,7 @@ function updateClouds(delta) {
     }
     if (cloud.x < -cloud.width) cloud.x = playfield.clientWidth + randomBetween(2, 20);
     if (cloud.x > playfield.clientWidth + 2) cloud.x = -cloud.width - randomBetween(2, 20);
-    cloud.node.style.transform = `translate(${Math.round(cloud.x)}px, ${Math.round(cloud.y)}px) scaleX(${cloud.flipped ? -1 : 1})`;
+    renderCloud(cloud);
   });
 }
 
@@ -230,7 +310,11 @@ function clampPlayerToBounds(now = performance.now()) {
 
 function resetPlayer() {
   setPlayerPosition(playfield.clientWidth / 2, playfield.clientHeight - 70);
+  entryScene.hidden = true;
+  entryScene.removeAttribute('src');
   player.style.opacity = '1';
+  player.classList.remove('is-entry-preintro');
+  player.style.removeProperty('--entry-preintro-size');
   player.classList.remove('is-shielded');
   player.classList.remove('is-grown');
   player.classList.remove('is-hurt', 'is-powerup-activating', 'is-powerup-switching', 'is-powerup-expiring');
@@ -776,10 +860,20 @@ function updateEnemyMovement(enemy, delta, now) {
       enemy.vy = enemy.speed;
       break;
     case 'sickle':
-      enemy.vx = Math.sin(now * .0022 + enemy.phase) * (66 + wave * 2);
-      enemy.vy = enemy.speed * .82;
-      // The handle endpoint is the pivot, so the blade continuously sweeps left and right.
-      enemy.image.style.setProperty('--enemy-angle', `${Math.round(Math.sin(now * .0056 + enemy.phase) * 82)}deg`);
+      {
+        const sickleClock = (now + enemy.phase * 1000) % SICKLE_BURST_CYCLE_MS;
+        const sickleCycle = Math.floor((now + enemy.phase * 1000) / SICKLE_BURST_CYCLE_MS);
+        const burstProgress = Math.min(1, sickleClock / SICKLE_BURST_MS);
+        const burstDirection = sickleCycle % 2 === 0 ? 1 : -1;
+        const burstActive = sickleClock < SICKLE_BURST_MS;
+        enemy.vx = burstActive ? burstDirection * (235 + wave * 5) : 0;
+        enemy.vy = burstActive ? enemy.speed * 2.15 : 0;
+        // Each burst reverses the blade through a wide arc around the handle endpoint.
+        const swipeStart = -burstDirection * SICKLE_SWIPE_ANGLE;
+        const swipeEnd = burstDirection * SICKLE_SWIPE_ANGLE;
+        const swipeAngle = swipeStart + (swipeEnd - swipeStart) * burstProgress;
+        enemy.image.style.setProperty('--enemy-angle', `${Math.round(swipeAngle)}deg`);
+      }
       break;
     default:
       enemy.vx = 0;
@@ -911,7 +1005,7 @@ function setCameraOffset(x, y) {
 }
 
 function resetCamera() {
-  setCameraOffset(0, 0);
+  setCameraOffset(0, ENTRY_PREINTRO_CAMERA_START_Y);
 }
 
 function triggerFatalImpactShake() {
@@ -1299,22 +1393,39 @@ function easeEntry(progress) {
   return clamped * clamped * (3 - 2 * clamped);
 }
 
+function getPreintroCameraTargetY(sceneY) {
+  const tarubTopOffset = PREINTRO_TARUB_VISIBLE_BOUNDS.y * (ENTRY_PREINTRO_SIZE / PREINTRO_SCENE_CANVAS_SIZE)
+    - ENTRY_PREINTRO_SIZE / 2;
+  return Math.round(playfield.clientHeight * PREINTRO_TARUB_TARGET_TOP_RATIO - (sceneY + tarubTopOffset));
+}
+
 function setEntryPhase(phase, now) {
   entryCutscene.phase = phase;
   entryCutscene.phaseStartedAt = now;
+  if (phase === 'wait') {
+    player.classList.remove('is-entry-preintro');
+    player.style.removeProperty('--entry-preintro-size');
+    entryScene.src = `${ENTRY_TRANSITION_FRAME}?entry-transition=${Math.round(now)}`;
+    entryScene.dataset.state = 'transition';
+    idleSerial += 1;
+    shipSprite.src = `${IDLE_GIF}?entry-idle=${idleSerial}`;
+    shipSprite.dataset.state = 'idle';
+  }
   if (phase === 'overshoot-hold') triggerEntryLaunchShake();
 }
 
 function beginEntryCutscene(now) {
   const finalX = playfield.clientWidth / 2;
   const finalY = playfield.clientHeight - 70;
+  const sceneY = playfield.clientHeight + SHIP_SIZE;
   entryCutsceneActive = true;
   entryCutscene = {
-    phase: 'wait',
+    phase: 'preintro',
     phaseStartedAt: now,
     finalX,
     finalY,
-    startY: playfield.clientHeight + SHIP_SIZE,
+    sceneY,
+    startY: sceneY + ENTRY_PREINTRO_JUNJUN_CENTER_OFFSET_Y,
     overshootY: Math.max(18, SHIP_SIZE * .24),
     tooFarDownY: finalY + 64,
     correctionHighY: finalY - 22,
@@ -1324,16 +1435,34 @@ function beginEntryCutscene(now) {
   };
   keys.clear();
   setPlayerPosition(finalX, entryCutscene.startY);
-  setCameraOffset(0, 0);
+  setCameraOffset(0, ENTRY_PREINTRO_CAMERA_START_Y);
+  player.classList.add('is-entry-preintro');
+  player.style.setProperty('--entry-preintro-size', `${ENTRY_PREINTRO_SIZE}px`);
+  entryScene.style.setProperty('--entry-preintro-size', `${ENTRY_PREINTRO_SIZE}px`);
+  entryScene.style.left = `${finalX}px`;
+  entryScene.style.top = `${entryCutscene.sceneY}px`;
+  entryScene.src = `${ENTRY_PREINTRO_GIF}?entry=${Math.round(now)}`;
+  entryScene.dataset.state = 'preintro';
+  entryScene.hidden = false;
 }
 
 function updateEntryCutscene(now, delta) {
   if (!entryCutsceneActive || !entryCutscene) return;
   const cutscene = entryCutscene;
+  const phaseAtFrameStart = cutscene.phase;
   const elapsed = now - cutscene.phaseStartedAt;
+  const finalizationRemaining = phaseAtFrameStart === 'correction-up'
+    ? ENTRY_FINALIZATION_MS - elapsed
+    : Number.POSITIVE_INFINITY;
+  if (clouds.length === 0 && finalizationRemaining <= CLOUD_SETTLE_LEAD_MS) createClouds(now);
   let y = cutscene.finalY;
   let environmentSpeed = .35;
   switch (cutscene.phase) {
+    case 'preintro':
+      y = cutscene.startY;
+      environmentSpeed = .35;
+      if (elapsed >= ENTRY_PREINTRO_MS) setEntryPhase('wait', now);
+      break;
     case 'wait':
       y = cutscene.startY;
       environmentSpeed = .35;
@@ -1399,6 +1528,12 @@ function updateEntryCutscene(now, delta) {
         keys.clear();
         setPlayerPosition(cutscene.finalX, cutscene.finalY);
         setCameraOffset(0, 0);
+        entryScene.hidden = true;
+        entryScene.removeAttribute('src');
+        entryScene.dataset.state = 'hidden';
+        if (clouds.length === 0) createClouds(now);
+        playfield.classList.add('is-gameplay-ui-visible');
+        playfieldWrap.classList.add('is-gameplay-ui-visible');
         spawnEnemy();
         return;
       }
@@ -1411,11 +1546,36 @@ function updateEntryCutscene(now, delta) {
   setPlayerPosition(cutscene.finalX, Math.round(y));
   const gameplayCameraY = cutscene.finalY - y;
   const centerCameraY = playfield.clientHeight / 2 - y;
+  const sceneCenterCameraY = playfield.clientHeight / 2 - cutscene.sceneY;
+  const preintroCameraTargetY = getPreintroCameraTargetY(cutscene.sceneY);
   let cameraTargetY = gameplayCameraY;
   let cameraEase = 4;
-  if (cutscene.phase === 'rocket') {
+  if (phaseAtFrameStart === 'preintro') {
+    // Move through the fixed world composition. A short low-camera beat leaves
+    // the sky empty, then the scene enters immediately and settles into framing.
+    const initialRevealProgress = Math.min(1, Math.max(0, (elapsed - ENTRY_PREINTRO_CAMERA_REVEAL_DELAY_MS) / ENTRY_PREINTRO_CAMERA_INITIAL_REVEAL_MS));
+    const slowRevealProgress = easeEntry(Math.min(1, Math.max(0, (elapsed - ENTRY_PREINTRO_CAMERA_REVEAL_DELAY_MS - ENTRY_PREINTRO_CAMERA_INITIAL_REVEAL_MS)
+      / (ENTRY_PREINTRO_MS - ENTRY_PREINTRO_CAMERA_REVEAL_DELAY_MS - ENTRY_PREINTRO_CAMERA_INITIAL_REVEAL_MS))));
+    if (elapsed < ENTRY_PREINTRO_CAMERA_REVEAL_DELAY_MS) {
+      cutscene.cameraY = ENTRY_PREINTRO_CAMERA_START_Y;
+    } else if (elapsed < ENTRY_PREINTRO_CAMERA_REVEAL_DELAY_MS + ENTRY_PREINTRO_CAMERA_INITIAL_REVEAL_MS) {
+      cutscene.cameraY = ENTRY_PREINTRO_CAMERA_START_Y * (1 - easeEntry(initialRevealProgress));
+    } else {
+      cutscene.cameraY = preintroCameraTargetY * slowRevealProgress;
+    }
+    setCameraOffset(cutscene.cameraX, cutscene.cameraY);
+    updateClouds(delta * environmentSpeed, now);
+    return;
+  } else if (phaseAtFrameStart === 'wait') {
+    // Hold the reveal framing during the handoff instead of snapping back
+    // before the existing launch begins.
+    cameraTargetY = preintroCameraTargetY;
+    cameraEase = 2.4;
+  } else if (phaseAtFrameStart === 'rocket') {
     // Follow the rocket toward the viewport center while deliberately lagging behind it.
-    cameraTargetY = gameplayCameraY + (centerCameraY - gameplayCameraY) * .72;
+    const launchProgress = Math.min(1, elapsed / ENTRY_ROCKET_MS);
+    const launchCameraBias = Math.min(0, preintroCameraTargetY - sceneCenterCameraY) * (1 - launchProgress);
+    cameraTargetY = gameplayCameraY + (centerCameraY - gameplayCameraY) * .72 + launchCameraBias;
     cameraEase = 4.5;
   } else if (cutscene.phase === 'overshoot-hold') {
     const holdProgress = Math.min(1, elapsed / ENTRY_OVERSHOOT_HOLD_MS);
@@ -1437,7 +1597,7 @@ function updateEntryCutscene(now, delta) {
   }
   cutscene.cameraY += (cameraTargetY - cutscene.cameraY) * Math.min(1, delta * cameraEase);
   setCameraOffset(cutscene.cameraX, cutscene.cameraY);
-  updateClouds(delta * environmentSpeed);
+  updateClouds(delta * environmentSpeed, now);
 }
 
 function loop(now) {
@@ -1455,7 +1615,7 @@ function loop(now) {
     return;
   }
   movePlayer(delta);
-  updateClouds(delta);
+  updateClouds(delta, now);
   replenishAmmo(now);
   updateAmmo();
   if ((keys.has(' ') || keys.has('Spacebar')) && now >= nextAutoShotAt) {
@@ -1491,6 +1651,8 @@ function startGame() {
   wave = 1;
   waveKills = 0;
   waveTransitionUntil = 0;
+  playfield.classList.remove('is-gameplay-ui-visible');
+  playfieldWrap.classList.remove('is-gameplay-ui-visible');
   enemySpawnSerial = 0;
   nextAutoShotAt = 0;
   ammoRechargeAt = 0;
@@ -1516,6 +1678,7 @@ function startGame() {
   powerups = [];
   clearPowerupParticles();
   resetPlayer();
+  clearClouds();
   resetCamera();
   shieldStatus.classList.add('is-hidden');
   growthStatus.classList.add('is-hidden');
@@ -1611,5 +1774,4 @@ window.addEventListener('resize', () => {
 });
 
 highScoreNode.textContent = padScore(Number(localStorage.getItem('tarubnijunjun-high-score') || 0));
-createClouds();
 resetPlayer();
