@@ -20,6 +20,7 @@ const waveProgressNode = document.querySelector('#wave-progress');
 const shieldStatus = document.querySelector('#shield-status');
 const growthStatus = document.querySelector('#growth-status');
 const ammoStatus = document.querySelector('#ammo-status');
+const spreadStatus = document.querySelector('#spread-status');
 const ammoHud = document.querySelector('#ammo-hud');
 const ammoPips = [...document.querySelectorAll('.ammo-pip')];
 const heartHud = document.querySelector('#heart-hud');
@@ -33,18 +34,85 @@ const DEATH_GIF = './public/assets/ship-death.gif';
 const DEATH_FRAMES = Array.from({ length: 8 }, (_, index) => `./public/assets/death-frames/frame-${String(index + 1).padStart(2, '0')}.png`);
 const PROJECTILE_FRAMES = Array.from({ length: 6 }, (_, index) => `./public/assets/projectile${index + 1}.png`);
 const ENTRY_PREINTRO_GIF = './public/assets/nagalulusijunjun.gif';
-const ENTRY_TRANSITION_FRAME = './public/assets/nagalulusijunjunlastframenotarub.gif';
+const ENTRY_TRANSITION_FRAME = './public/assets/nagalulusijunjun-transition.gif';
 const SHIELD_POWERUP_IMAGE = './public/assets/durexnijunjun.png';
 const GROWTH_POWERUP_IMAGE = './public/assets/viagranijunjun.png';
 const AMMO_PACK_IMAGE = './public/assets/ammopack.png';
-const ENEMY_ASSETS = [
-  { name: 'knife', behavior: 'knife', src: './public/assets/kutsily.png', alphaBounds: [21, 13, 28, 41] },
-  { name: 'arrow', behavior: 'arrow', src: './public/assets/arrow.png', alphaBounds: [21, 14, 27, 32] },
-  { name: 'scissor', behavior: 'scissor', src: './public/assets/scissor.png', alphaBounds: [20, 12, 28, 35] },
-  { name: 'cannonball', behavior: 'cannonball', src: './public/assets/cannonball.png', alphaBounds: [20, 21, 27, 28] },
-  { name: 'axe', behavior: 'axe', src: './public/assets/axe.png', alphaBounds: [20, 15, 28, 31] },
-  { name: 'sickle', behavior: 'sickle', src: './public/assets/sickle.png', alphaBounds: [16, 15, 28, 31] },
+const SPREAD_POWERUP_IMAGE = './public/assets/magazine.png';
+const SPREAD_ENABLED_IMAGE = './public/assets/magazineenabled.png';
+const BOMB_EXPLOSION_FRAME_MS = 65;
+const BOMB_EXPLOSION_SIZE = 148;
+const BOMB_EXPLOSION_FRAMES = [
+  [1, [17, 14, 31, 34]], [2, [9, 9, 35, 39]], [3, [3, 4, 36, 44]],
+  [4, [5, 4, 40, 44]], [5, [7, 8, 38, 41]], [6, [8, 8, 36, 41]], [7, null],
+].map(([number, alphaBounds]) => ({
+  src: `./public/assets/explosion-1-g/frame${number}.png`, alphaBounds,
+}));
+const ENEMY_DEFINITIONS = [
+  {
+    name: 'arrow', src: './public/assets/arrow.png', alphaBounds: [21, 14, 27, 32], size: 108,
+    baseSpeed: 280, waveSpeedStep: .055, maxSpeedMultiplier: 1.45, health: 1, threat: 1,
+    unlockWave: 1, entryWarningMs: 150,
+    trail: { lifespan: 230, sampleMs: 28, width: 2, opacity: .48 },
+  },
+  {
+    name: 'knife', src: './public/assets/kutsily.png', alphaBounds: [21, 13, 28, 41], size: 78,
+    baseSpeed: 98, waveSpeedStep: .085, maxSpeedMultiplier: 1.75, health: 1, threat: 1.3,
+    unlockWave: 1, attackDistance: 190, telegraphScale: .9, strikeScale: .76, recoveryScale: .84,
+    trail: { lifespan: 190, sampleMs: 20, width: 2.2, opacity: .52, activeState: 'strike' },
+  },
+  {
+    name: 'scissor', src: './public/assets/scissor.png', alphaBounds: [20, 12, 28, 35], size: 92,
+    baseSpeed: 178, waveSpeedStep: .07, maxSpeedMultiplier: 1.6, health: 1, threat: 1.3,
+    unlockWave: 2,
+    trail: { lifespan: 180, sampleMs: 34, width: 1.2, opacity: .18 },
+  },
+  {
+    name: 'cannonball', src: './public/assets/cannonball.png', alphaBounds: [20, 21, 27, 28], size: 116,
+    baseSpeed: 450, waveSpeedStep: .035, maxSpeedMultiplier: 1.28, health: 1, threat: 1.6,
+    unlockWave: 3, entryWarningMs: 300, spawnGroup: 'lane-burst',
+    trail: { lifespan: 330, sampleMs: 18, width: 5, opacity: .58 },
+  },
+  {
+    name: 'fork', src: './public/assets/forkenemy.png', alphaBounds: [21, 14, 26, 28], size: 148,
+    collisionBoxes: [[22, 14, 25, 24], [21, 24, 26, 25], [21, 25, 22, 28], [23, 25, 24, 28], [25, 25, 26, 28]],
+    baseSpeed: 92, waveSpeedStep: .06, maxSpeedMultiplier: 1.45, health: 1, threat: 1.4,
+    unlockWave: 3, spawnGroup: 'space-control', trail: null,
+  },
+  {
+    name: 'axe', src: './public/assets/axe.png', alphaBounds: [20, 15, 28, 31], size: 126,
+    baseSpeed: 128, waveSpeedStep: .055, maxSpeedMultiplier: 1.45, health: 1, threat: 1.6,
+    unlockWave: 4, wallSpeed: 188, maxBounces: 3, spawnGroup: 'rebound',
+    trail: { lifespan: 280, sampleMs: 26, width: 2.4, opacity: .28 },
+    rotationOrigin: [24, 23],
+  },
+  {
+    name: 'sawblade', src: './public/assets/sawbladeenemy.png', alphaBounds: [15, 16, 32, 33], size: 112,
+    baseSpeed: 82, waveSpeedStep: .05, maxSpeedMultiplier: 1.4, health: 1, threat: 1.7,
+    unlockWave: 4, wallSpeed: 225, maxBounces: 4, spawnGroup: 'rebound',
+    trail: { lifespan: 240, sampleMs: 24, width: 3, opacity: .3 },
+  },
+  {
+    name: 'sickle', src: './public/assets/sickleenemy.png', alphaBounds: [16, 15, 29, 29], size: 104,
+    baseSpeed: 105, waveSpeedStep: .05, maxSpeedMultiplier: 1.45, health: 1, threat: 1.7,
+    unlockWave: 5, spawnGroup: 'sweep',
+    trail: { lifespan: 430, sampleMs: 20, width: 5.2, opacity: .5, activeState: 'sweep' },
+    rotationOrigin: [22.5, 22], rotationOffset: 45,
+  },
+  {
+    name: 'bomb', src: './public/assets/bombenemy.png', alphaBounds: [19, 15, 31, 29], size: 124,
+    baseSpeed: 68, waveSpeedStep: .035, maxSpeedMultiplier: 1.25, health: 1, threat: 1.8,
+    unlockWave: 5, fuseMs: 5200, spawnGroup: 'priority', trail: null,
+  },
+  {
+    name: 'hammer', src: './public/assets/hammerenemy.png', alphaBounds: [21, 16, 29, 29], size: 138,
+    baseSpeed: 110, waveSpeedStep: .04, maxSpeedMultiplier: 1.35, health: 1, threat: 1.8,
+    unlockWave: 5, spawnGroup: 'lane-burst',
+    trail: { lifespan: 300, sampleMs: 18, width: 5.4, opacity: .5, activeState: 'slam' },
+    rotationOrigin: [25, 22.5], rotationOffset: 90,
+  },
 ];
+const ENEMY_BY_NAME = Object.fromEntries(ENEMY_DEFINITIONS.map((enemy) => [enemy.name, enemy]));
 const SHIP_SIZE = 100;
 const POWERUP_SIZE = 100;
 const GROWTH_SCALE = 1.2;
@@ -65,6 +133,7 @@ const GROWN_PROJECTILE_SIZE = 28;
 const SHIELD_DURATION_MS = 7000;
 const GROWTH_DURATION_MS = 7000;
 const AMMO_PACK_DURATION_MS = 7000;
+const SPREAD_SHOT_DURATION_MS = 7000;
 const MAX_HEARTS = 3;
 const INVULNERABILITY_MS = 900;
 const POWERUP_WARNING_MS = 2500;
@@ -78,12 +147,13 @@ const FATAL_DASH_MS = 85;
 const FATAL_PRE_IMPACT_GAP_PX = 8;
 const FATAL_RISE_PX = 96;
 const FATAL_EXTRA_RISE_PX = 14;
-const SICKLE_BURST_CYCLE_MS = 1250;
-const SICKLE_BURST_MS = 420;
-const SICKLE_SWIPE_ANGLE = 132;
 const WAVE_KILL_TARGET = 5;
-const ENTRY_WAIT_MS = 600;
+const ENTRY_WAIT_MS = 340;
 const ENTRY_PREINTRO_MS = 5000;
+const ENTRY_PRELAUNCH_PUSH_MS = 760;
+const ENTRY_PRELAUNCH_ZOOM = 1.12;
+const ENTRY_CAMERA_REACTION_DELAY_MS = 150;
+const ENTRY_BRACE_OFFSET_PX = 6;
 const GAMEPLAY_JUNJUN_CANVAS_SIZE = 50;
 const GAMEPLAY_JUNJUN_VISIBLE_BOUNDS = { x: 13, y: 8, width: 22, height: 34 };
 const PREINTRO_SCENE_CANVAS_SIZE = 200;
@@ -107,7 +177,7 @@ const ENTRY_PREINTRO_CAMERA_REVEAL_DELAY_MS = 220;
 const ENTRY_PREINTRO_CAMERA_INITIAL_REVEAL_MS = 320;
 // The reference composition keeps Tarub's visible top below the viewport center.
 const PREINTRO_TARUB_TARGET_TOP_RATIO = .56;
-const ENTRY_ROCKET_MS = 360;
+const ENTRY_ROCKET_MS = 520;
 const ENTRY_OVERSHOOT_HOLD_MS = 450;
 const ENTRY_DRIFT_MS = 700;
 const ENTRY_LOW_PAUSE_MS = 160;
@@ -116,19 +186,21 @@ const ENTRY_TINY_PAUSE_MS = 140;
 const ENTRY_CORRECTION_DOWN_MS = 220;
 const ENTRY_SETTLE_MS = 250;
 const ENTRY_SETTLE_HOLD_MS = 300;
+const ENTRY_FREEDOM_MS = 1800;
+const ENTRY_FREEDOM_CONTROL_DELAY_MS = 320;
+const ENTRY_FREEDOM_HUD_DELAY_MS = 900;
 const CLOUD_WIDTH = 180;
 const CLOUD_HEIGHT = 90;
-const CLOUD_SETTLE_DURATION_MS = 720;
-const CLOUD_SETTLE_STAGGER_MS = 12;
-const CLOUD_SETTLE_LEAD_MS = 1000;
-const ENTRY_FINALIZATION_MS = ENTRY_CORRECTION_UP_MS + ENTRY_TINY_PAUSE_MS + ENTRY_CORRECTION_DOWN_MS + ENTRY_SETTLE_MS + ENTRY_SETTLE_HOLD_MS;
-const ENEMY_BEHAVIORS = {
-  scissor: { name: 'scissor', size: 92, baseSpeed: 178, speedScale: 1.05, health: 1, canStrike: false },
-  knife: { name: 'knife', size: 78, baseSpeed: 98, speedScale: 1, health: 1, canStrike: true, attackDistance: 190, telegraphScale: .9, strikeScale: .76, recoveryScale: .84 },
-  axe: { name: 'axe', size: 126, baseSpeed: 130, speedScale: .88, wallSpeed: 220, health: 1, canStrike: false, trailEnabled: false },
-  arrow: { name: 'arrow', size: 108, baseSpeed: 280, speedScale: 1.02, health: 1, canStrike: false },
-  cannonball: { name: 'cannonball', size: 116, baseSpeed: 450, speedScale: .92, health: 1, canStrike: false },
-  sickle: { name: 'sickle', size: 104, baseSpeed: 88, speedScale: .96, health: 1, canStrike: false, trailEnabled: false },
+const WAVE_ONE_SPAWN_DELAYS_MS = [0, 1150, 1350, 1550, 1750];
+const WAVE_ONE_ENEMIES = ['arrow', 'arrow', 'knife', 'arrow', 'knife'];
+const TRAIL_SEGMENT_LIMIT = 18;
+const POWERUP_VISUALS = {
+  growth: { src: GROWTH_POWERUP_IMAGE, renderSize: 100 },
+  shield: { src: SHIELD_POWERUP_IMAGE, renderSize: 100 },
+  ammo: { src: AMMO_PACK_IMAGE, renderSize: 100 },
+  // Visible art is 19x26 inside a padded 75x100 canvas. Keep collection bounds
+  // at 100x100 while increasing only rendered art to match other powerups.
+  spread: { src: SPREAD_POWERUP_IMAGE, renderSize: 132 },
 };
 const CLOUD_TYPES = [
   { src: './public/assets/cloud1.png', width: CLOUD_WIDTH, height: CLOUD_HEIGHT, minSpeed: 82, maxSpeed: 112, maxDrift: 18 },
@@ -161,7 +233,10 @@ let entryCutscene = null;
 let shieldedUntil = 0;
 let grownUntil = 0;
 let ammoBoostUntil = 0;
+let spreadShotUntil = 0;
 let nextPowerupAt = 2500;
+let nextEnemyAt = 0;
+let waveOnePowerupSpawned = false;
 let score = 0;
 let hearts = MAX_HEARTS;
 let ammo = MAX_AMMO;
@@ -181,6 +256,7 @@ let nextPowerupParticleAt = 0;
 let nextShotAllowedAt = 0;
 let clouds = [];
 let enemySpawnSerial = 0;
+let lastEnemyType = '';
 
 function padScore(value) { return String(value).padStart(6, '0'); }
 function randomBetween(min, max) { return min + Math.random() * (max - min); }
@@ -210,7 +286,7 @@ function renderCloud(cloud) {
   cloud.node.style.transform = `translate(${Math.round(cloud.x)}px, ${Math.round(cloud.y)}px) scaleX(${cloud.flipped ? -1 : 1})`;
 }
 
-function createClouds(now = performance.now()) {
+function createClouds(introSceneY) {
   clearClouds();
   const cloudSlots = [
     [0.04, 0.08], [0.37, 0.04], [0.71, 0.1],
@@ -230,54 +306,36 @@ function createClouds(now = performance.now()) {
     cloud.node.width = type.width;
     cloud.node.height = type.height;
     applyCloudDepth(cloud);
-    const [slotX, slotY] = cloudSlots[index];
+    const [slotX] = cloudSlots[index];
     const maxX = Math.max(0, playfield.clientWidth - cloud.width);
-    const maxY = Math.max(0, playfield.clientHeight - cloud.height);
-    const targetX = Math.max(0, Math.min(maxX, maxX * slotX + randomBetween(-14, 14)));
-    const targetY = Math.max(0, Math.min(maxY, maxY * slotY + randomBetween(-12, 12)));
-    cloud.targetX = targetX;
-    cloud.targetY = targetY;
-    cloud.entryStartedAt = now;
-    cloud.entryDelayMs = index * CLOUD_SETTLE_STAGGER_MS;
-    // Start close to the final composition so the adjustment reads as background drift.
-    cloud.entryStartX = targetX + randomBetween(-28, 28);
-    cloud.entryStartY = targetY + randomBetween(-18, 18);
-    cloud.settleSpeedScale = .35;
-    cloud.x = cloud.entryStartX;
-    cloud.y = cloud.entryStartY;
+    cloud.x = Math.max(0, Math.min(maxX, maxX * slotX + randomBetween(-14, 14)));
+    const verticalProgress = index / (cloudSlots.length - 1);
+    cloud.y = introSceneY + 120 - verticalProgress * 1080 + randomBetween(-22, 22);
     (foreground ? foregroundCloudLayer : cloudLayer).append(cloud.node);
     renderCloud(cloud);
     return cloud;
   });
 }
 
-function updateClouds(delta, now = performance.now()) {
+function updateClouds(delta, motion = {}) {
+  const {
+    verticalScale = 1,
+    horizontalScale = 1,
+    launchParallax = 0,
+    recycle = true,
+  } = motion;
   const height = playfield.clientHeight;
   clouds.forEach((cloud) => {
-    if (cloud.entryStartedAt !== null) {
-      const entryProgress = Math.max(0, Math.min(1, (now - cloud.entryStartedAt - cloud.entryDelayMs) / CLOUD_SETTLE_DURATION_MS));
-      const entryEase = easeEntry(entryProgress);
-      cloud.x = cloud.entryStartX + (cloud.targetX - cloud.entryStartX) * entryEase;
-      cloud.y = cloud.entryStartY + (cloud.targetY - cloud.entryStartY) * entryEase;
-      if (entryProgress >= 1) {
-        cloud.x = cloud.targetX;
-        cloud.y = cloud.targetY;
-        cloud.entryStartedAt = null;
-        cloud.settleSpeedScale = 1;
-      }
-      cloud.settleSpeedScale = cloud.entryStartedAt === null ? 1 : .35 + entryEase * .65;
-      renderCloud(cloud);
-      if (cloud.entryStartedAt !== null) return;
-    }
-    cloud.y += cloud.speed * delta * (cloud.settleSpeedScale || 1);
-    cloud.x += cloud.vx * delta;
-    if (cloud.y > height + cloud.height) {
+    const depthFactor = .12 + cloud.depth * .72 + (cloud.foreground ? .2 : 0);
+    cloud.y += (cloud.speed * verticalScale + launchParallax * depthFactor) * delta;
+    cloud.x += cloud.vx * horizontalScale * delta;
+    if (recycle && cloud.y > height + cloud.height) {
       applyCloudDepth(cloud);
       cloud.x = randomBetween(0, Math.max(0, playfield.clientWidth - cloud.width));
       cloud.y = -cloud.height - randomBetween(0, 80);
     }
-    if (cloud.x < -cloud.width) cloud.x = playfield.clientWidth + randomBetween(2, 20);
-    if (cloud.x > playfield.clientWidth + 2) cloud.x = -cloud.width - randomBetween(2, 20);
+    if (recycle && cloud.x < -cloud.width) cloud.x = playfield.clientWidth + randomBetween(2, 20);
+    if (recycle && cloud.x > playfield.clientWidth + 2) cloud.x = -cloud.width - randomBetween(2, 20);
     renderCloud(cloud);
   });
 }
@@ -311,9 +369,9 @@ function clampPlayerToBounds(now = performance.now()) {
 function resetPlayer() {
   setPlayerPosition(playfield.clientWidth / 2, playfield.clientHeight - 70);
   entryScene.hidden = true;
-  entryScene.removeAttribute('src');
+  entryScene.dataset.state = 'hidden';
   player.style.opacity = '1';
-  player.classList.remove('is-entry-preintro');
+  player.classList.remove('is-entry-preintro', 'is-entry-anticipating', 'is-entry-bracing', 'is-entry-relieved');
   player.style.removeProperty('--entry-preintro-size');
   player.classList.remove('is-shielded');
   player.classList.remove('is-grown');
@@ -371,12 +429,17 @@ function activateAmmoPack(now) {
   }
 }
 
+function activateSpreadShot(now) {
+  triggerPowerupTransition('spread', now);
+  spreadShotUntil = Math.max(spreadShotUntil, now) + SPREAD_SHOT_DURATION_MS;
+}
+
 function getAmmoRechargeMultiplier(now) {
   return ammoBoostUntil > now ? 3 : 1;
 }
 
 function triggerPowerupTransition(type, now) {
-  const replacingActivePowerup = shieldedUntil > now || grownUntil > now;
+  const replacingActivePowerup = shieldedUntil > now || grownUntil > now || ammoBoostUntil > now || spreadShotUntil > now;
   powerupTransitionSerial += 1;
   const transition = powerupTransitionSerial;
   player.classList.remove('is-powerup-activating', 'is-powerup-switching');
@@ -396,7 +459,7 @@ function clearPowerupParticles() {
 }
 
 function emitPowerupParticles(now, count = 1) {
-  const expiring = [shieldedUntil, grownUntil].some((until) => until > now && until - now <= POWERUP_WARNING_MS);
+  const expiring = [shieldedUntil, grownUntil, spreadShotUntil].some((until) => until > now && until - now <= POWERUP_WARNING_MS);
   for (let index = 0; index < count; index += 1) {
     const angle = randomBetween(0, Math.PI * 2);
     const speed = randomBetween(34, 74);
@@ -418,9 +481,9 @@ function emitPowerupParticles(now, count = 1) {
 }
 
 function updatePowerupParticles(delta, now) {
-  const active = shieldedUntil > now || grownUntil > now;
+  const active = shieldedUntil > now || grownUntil > now || spreadShotUntil > now;
   if (active && now >= nextPowerupParticleAt) {
-    const expiring = [shieldedUntil, grownUntil].some((until) => until > now && until - now <= POWERUP_WARNING_MS);
+    const expiring = [shieldedUntil, grownUntil, spreadShotUntil].some((until) => until > now && until - now <= POWERUP_WARNING_MS);
     if (!expiring || Math.random() > 0.35) emitPowerupParticles(now, expiring ? 1 : 2);
     nextPowerupParticleAt = now + (expiring ? randomBetween(360, 620) : randomBetween(500, 820));
   }
@@ -429,7 +492,7 @@ function updatePowerupParticles(delta, now) {
     particle.x += particle.vx * delta;
     particle.y += particle.vy * delta;
     const progress = particle.age / particle.life;
-    const intermittent = active && [shieldedUntil, grownUntil]
+    const intermittent = active && [shieldedUntil, grownUntil, spreadShotUntil]
       .some((until) => until > now && until - now <= POWERUP_WARNING_MS)
       && Math.floor(now / 100) % 2 === 0;
     particle.node.style.transform = `translate(${Math.round(particle.x)}px, ${Math.round(particle.y)}px)`;
@@ -487,7 +550,16 @@ function fire(now) {
   }, SHOOT_ANIMATION_MS);
 
   window.setTimeout(() => {
-    if (running && !fatalSequenceActive && !deathSequenceActive) spawnProjectile();
+    if (running && !fatalSequenceActive && !deathSequenceActive) {
+      const spreadActive = spreadShotUntil > performance.now();
+      if (spreadActive) {
+        spawnProjectile(-22);
+        spawnProjectile(0);
+        spawnProjectile(22);
+      } else {
+        spawnProjectile(0);
+      }
+    }
   }, PROJECTILE_DELAY_MS);
   return true;
 }
@@ -498,13 +570,17 @@ function restartShootingAnimation(shieldActive) {
   shipSprite.src = `${shieldActive ? SHIELD_GIF : SHOOTING_GIF}?shot=${shotSerial}`;
 }
 
-function spawnProjectile() {
+function spawnProjectile(angleDegrees = 0) {
   const { halfHeight } = getPlayerPixelBounds();
   const grown = grownUntil > performance.now();
   const size = grown ? GROWN_PROJECTILE_SIZE : PROJECTILE_SIZE;
+  const angle = angleDegrees * Math.PI / 180;
+  const projectileSpeed = 480;
   const projectile = {
     x: playerPosition.x - size / 2,
     y: playerPosition.y - halfHeight - size,
+    vx: Math.sin(angle) * projectileSpeed,
+    vy: Math.cos(angle) * projectileSpeed,
     width: size,
     height: size,
     spawnedAt: performance.now(),
@@ -524,8 +600,7 @@ function spawnProjectile() {
 function getWaveTuning() {
   const level = Math.max(0, wave - 1);
   return {
-    speedMultiplier: 1 + Math.min(1.15, level * .11),
-    spawnRate: .65 + level * .09,
+    threatBudget: Math.min(7.6, 2.7 + level * .56),
     attackDelay: Math.max(260, 1100 - level * 80),
     telegraphMs: Math.max(280, 700 - level * 45),
     recoveryMs: Math.max(380, 1000 - level * 75),
@@ -534,190 +609,343 @@ function getWaveTuning() {
   };
 }
 
-function spawnEnemy() {
-  const availableCount = Math.min(ENEMY_ASSETS.length, wave + 1);
-  const type = ENEMY_ASSETS[enemySpawnSerial % availableCount];
-  const behavior = ENEMY_BEHAVIORS[type.behavior];
+function getEnemySpeedMultiplier(definition) {
+  return Math.min(definition.maxSpeedMultiplier, 1 + Math.max(0, wave - definition.unlockWave) * definition.waveSpeedStep);
+}
+
+function getEnemySpawnInterval() {
+  if (wave <= 2) return randomBetween(650, 900);
+  if (wave <= 4) return randomBetween(500, 700);
+  if (wave <= 7) return randomBetween(420, 590);
+  return randomBetween(350, 520);
+}
+
+function getActiveThreat() {
+  return enemies.reduce((total, enemy) => total + (!enemy.retreating && !enemy.isDying && !enemy.exploded ? enemy.definition.threat : 0), 0);
+}
+
+function canAddEnemy(definition, tuning) {
+  if (getActiveThreat() + definition.threat > tuning.threatBudget + .01) return false;
+  const active = enemies.filter((enemy) => !enemy.retreating && !enemy.isDying && !enemy.exploded);
+  if (definition.name === 'bomb' && active.some((enemy) => enemy.definition.name === 'bomb')) return false;
+  if (definition.name === 'hammer' && active.some((enemy) => enemy.definition.name === 'hammer')) return false;
+  if (definition.spawnGroup === 'lane-burst' && active.some((enemy) => enemy.definition.spawnGroup === 'lane-burst')) return false;
+  if (definition.spawnGroup === 'rebound' && active.filter((enemy) => enemy.definition.spawnGroup === 'rebound').length >= 2) return false;
+  if (definition.spawnGroup === 'space-control' && active.filter((enemy) => enemy.definition.spawnGroup === 'space-control').length >= 2) return false;
+  if (wave < 7 && definition.spawnGroup === 'priority' && active.some((enemy) => enemy.definition.spawnGroup === 'lane-burst')) return false;
+  if (wave < 7 && definition.spawnGroup === 'lane-burst' && active.some((enemy) => enemy.definition.spawnGroup === 'priority')) return false;
+  return true;
+}
+
+function chooseEnemyDefinition() {
+  const tuning = getWaveTuning();
+  let choices = ENEMY_DEFINITIONS.filter((definition) => definition.unlockWave <= wave && canAddEnemy(definition, tuning));
+  if (choices.length > 1) {
+    const freshChoices = choices.filter((definition) => definition.name !== lastEnemyType);
+    if (freshChoices.length > 0) choices = freshChoices;
+  }
+  if (choices.length === 0) return null;
+  const totalWeight = choices.reduce((total, definition) => total + 1 / definition.threat, 0);
+  let roll = Math.random() * totalWeight;
+  return choices.find((definition) => {
+    roll -= 1 / definition.threat;
+    return roll <= 0;
+  }) || choices[choices.length - 1];
+}
+
+function createScaledBounds(bounds, scale) {
+  const [left, top, right, bottom] = bounds;
+  return {
+    left: left * scale,
+    top: top * scale,
+    right: right * scale,
+    bottom: bottom * scale,
+    width: (right - left) * scale,
+    height: (bottom - top) * scale,
+    centerX: (left + right) * scale / 2,
+    centerY: (top + bottom) * scale / 2,
+  };
+}
+
+function createEnemyTrail(enemy) {
+  const trail = enemy.definition.trail;
+  if (!trail) return;
+  const namespace = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(namespace, 'svg');
+  svg.classList.add('enemy-motion-trail', `enemy-motion-trail-${enemy.definition.name}`);
+  svg.setAttribute('aria-hidden', 'true');
+  const lines = Array.from({ length: TRAIL_SEGMENT_LIMIT }, () => {
+    const line = document.createElementNS(namespace, 'line');
+    line.setAttribute('vector-effect', 'non-scaling-stroke');
+    svg.append(line);
+    return line;
+  });
+  enemy.trail = { ...trail, node: svg, lines, points: [], lastSampleAt: 0 };
+  enemyLayer.append(svg);
+}
+
+function createEnemyWarning(enemy) {
+  if (!enemy.definition.entryWarningMs || enemy.definition.name === 'arrow') return;
+  const warning = document.createElement('i');
+  warning.className = `enemy-entry-warning enemy-entry-warning-${enemy.definition.name}`;
+  enemy.warningNode = warning;
+  enemyLayer.append(warning);
+}
+
+function spawnEnemy(forcedName = '') {
+  const waveOneIndex = Math.min(WAVE_KILL_TARGET - 1, waveKills);
+  const definition = forcedName
+    ? ENEMY_BY_NAME[forcedName]
+    : wave === 1
+      ? ENEMY_BY_NAME[WAVE_ONE_ENEMIES[waveOneIndex]]
+      : chooseEnemyDefinition();
+  if (!definition) return false;
   enemySpawnSerial += 1;
   const tuning = getWaveTuning();
   const now = performance.now();
   const width = playfield.clientWidth;
-  const size = behavior.size;
+  const size = definition.size;
+  const scale = size / 50;
+  const visualBounds = createScaledBounds(definition.alphaBounds, scale);
+  const visualCenterX = randomBetween(visualBounds.width / 2 + 10, width - visualBounds.width / 2 - 10);
+  const entryReveal = definition.name === 'arrow' ? 3 : 0;
+  const initialY = definition.name === 'hammer' ? 18 - visualBounds.top : -visualBounds.bottom + entryReveal;
   const enemy = {
-    type,
-    behavior,
-    entry: 'top',
+    definition,
+    type: definition,
     size,
-    x: randomBetween(size / 2, width - size / 2),
-    y: -size,
-    speed: behavior.baseSpeed * behavior.speedScale * tuning.speedMultiplier,
-    vx: randomBetween(-18, 18),
+    visualBounds,
+    collisionBoxes: (definition.collisionBoxes || [definition.alphaBounds]).map((bounds) => createScaledBounds(bounds, scale)),
+    x: visualCenterX - visualBounds.centerX,
+    y: initialY,
+    speed: definition.baseSpeed * getEnemySpeedMultiplier(definition)
+      * (wave === 1 ? [.72, .78, .86, .94, 1.02][waveOneIndex] : 1),
+    vx: 0,
     vy: 0,
-    health: behavior.health,
+    angle: 0,
+    health: definition.health,
     hitAt: 0,
-    attackReadyAt: now + tuning.attackDelay + randomBetween(-120, 160),
+    spawnedAt: now,
+    entryReadyAt: now + (definition.entryWarningMs || 0),
+    entryPending: true,
+    attackReadyAt: now + tuning.attackDelay + (wave === 1 ? [700, 420, 260, 120, 0][waveOneIndex] : randomBetween(-120, 160)),
     phase: randomBetween(0, Math.PI * 2),
-    driftVx: 0,
-    wallVx: behavior.name === 'axe'
-      ? (Math.random() < .5 ? -1 : 1) * behavior.wallSpeed * randomBetween(.82, 1.12) * tuning.speedMultiplier
+    weaveCenterX: visualCenterX,
+    weaveAmplitude: randomBetween(82, 110),
+    weaveRate: randomBetween(.00235, .00285),
+    wallVx: ['axe', 'sawblade'].includes(definition.name)
+      ? (Math.random() < .5 ? -1 : 1) * definition.wallSpeed * getEnemySpeedMultiplier(definition)
       : 0,
     lockOn: Math.random() < .45,
-    downwardScale: behavior.name === 'axe' ? randomBetween(.88, 1.22) : 1,
-    canStrike: behavior.canStrike && (behavior.name !== 'knife' || Math.random() < .55),
+    canStrike: definition.name === 'knife' && (wave === 1 ? waveOneIndex === 4 : true),
     passedPlayer: false,
-    spinAngle: randomBetween(0, 360),
-    sweepDirection: Math.random() < .5 ? -1 : 1,
+    bounceCount: 0,
+    maxBounces: definition.name === 'axe' ? 2 + enemySpawnSerial % 2 : definition.name === 'sawblade' ? 2 + enemySpawnSerial % 3 : 0,
+    sweepDirection: visualCenterX < width / 2 ? 1 : -1,
     attackState: 'approach',
+    specialState: definition.name === 'sickle' ? 'entry' : definition.name === 'bomb' ? 'fuse' : definition.name === 'hammer' ? 'tracking' : '',
+    stateStartedAt: now,
+    fuseEndsAt: definition.name === 'bomb' ? now + definition.fuseMs : 0,
     attackStartedAt: 0,
     recoveryUntil: 0,
     strikeContactPending: false,
+    retreating: false,
+    harmless: false,
     node: document.createElement('i'),
   };
   enemy.node.className = 'enemy';
-  enemy.node.classList.add(`enemy-${type.name}`);
-  enemy.node.classList.add(`enemy-behavior-${behavior.name}`);
+  enemy.node.classList.add(`enemy-${definition.name}`);
   enemy.node.style.setProperty('--enemy-size', `${size}px`);
-  const trail = behavior.trailEnabled === false ? null : document.createElement('span');
-  if (trail) {
-    trail.className = `enemy-trail enemy-trail-${behavior.name}`;
-    enemy.trailCount = behavior.name === 'arrow' ? 1 : behavior.name === 'cannonball' ? 2 : 3;
-    enemy.trailNodes = [0, 1, 2].map((index) => {
-      const pixel = document.createElement('i');
-      pixel.className = `enemy-trail-segment enemy-trail-segment-${index + 1}`;
-      trail.append(pixel);
-      return pixel;
-    });
+  enemy.node.style.setProperty('--enemy-visual-center-x', `${visualBounds.centerX}px`);
+  enemy.node.style.setProperty('--enemy-visual-center-y', `${visualBounds.centerY}px`);
+  enemy.node.style.setProperty('--enemy-visual-top', `${visualBounds.top}px`);
+  if (definition.rotationOrigin) {
+    enemy.node.style.setProperty('--enemy-origin-x', `${definition.rotationOrigin[0] * 2}%`);
+    enemy.node.style.setProperty('--enemy-origin-y', `${definition.rotationOrigin[1] * 2}%`);
   }
-  enemy.trail = trail;
   const image = document.createElement('img');
-  image.src = type.src;
+  image.src = definition.src;
   image.alt = '';
   image.width = size;
   image.height = size;
   enemy.image = image;
-  if (trail) enemy.node.append(trail);
   enemy.node.append(image);
-  enemy.node.style.transform = `translate(${Math.round(enemy.x)}px, ${Math.round(enemy.y)}px)`;
-  updateEnemyTrail(enemy);
+  createEnemyTrail(enemy);
+  createEnemyWarning(enemy);
   enemyLayer.append(enemy.node);
   enemies.push(enemy);
+  lastEnemyType = definition.name;
+  renderEnemy(enemy, now);
+  return true;
+}
+
+function rotateEnemyBox(enemy, box) {
+  if (!enemy.angle) {
+    return { left: enemy.x + box.left, top: enemy.y + box.top, right: enemy.x + box.right, bottom: enemy.y + box.bottom };
+  }
+  const angle = enemy.angle * Math.PI / 180;
+  const cosine = Math.cos(angle);
+  const sine = Math.sin(angle);
+  const originX = enemy.definition.rotationOrigin ? enemy.definition.rotationOrigin[0] * enemy.size / 50 : enemy.size / 2;
+  const originY = enemy.definition.rotationOrigin ? enemy.definition.rotationOrigin[1] * enemy.size / 50 : enemy.size / 2;
+  const points = [[box.left, box.top], [box.right, box.top], [box.right, box.bottom], [box.left, box.bottom]].map(([x, y]) => ({
+    x: enemy.x + originX + (x - originX) * cosine - (y - originY) * sine,
+    y: enemy.y + originY + (x - originX) * sine + (y - originY) * cosine,
+  }));
+  return {
+    left: Math.min(...points.map((point) => point.x)),
+    top: Math.min(...points.map((point) => point.y)),
+    right: Math.max(...points.map((point) => point.x)),
+    bottom: Math.max(...points.map((point) => point.y)),
+  };
 }
 
 function getEnemySpriteBounds(enemy) {
-  const scale = enemy.size / 50;
-  const [left, top, right, bottom] = enemy.type.alphaBounds.map((value) => value * scale);
-  return { left: enemy.x + left, top: enemy.y + top, right: enemy.x + right, bottom: enemy.y + bottom };
+  return rotateEnemyBox(enemy, enemy.visualBounds);
 }
 
-function updateEnemyTrail(enemy) {
-  if (!enemy.trail) return;
-  const velocity = Math.hypot(enemy.vx, enemy.vy) || 1;
-  const behaviorName = enemy.behavior.name;
-  const attacking = enemy.attackState === 'telegraph' || enemy.attackState === 'strike';
-  const trailProfiles = {
-    scissor: { base: 5, velocityScale: .045, threshold: 145, normalOpacity: .2, attackOpacity: .58, normalCount: 0 },
-    knife: { base: 8, velocityScale: .07, threshold: 150, normalOpacity: .18, attackOpacity: .7, normalCount: 0 },
-  axe: { base: 14, velocityScale: .06, threshold: 0, normalOpacity: 0, attackOpacity: 0, normalCount: 0, trailEnabled: false },
-    arrow: { base: 10, velocityScale: .04, threshold: 0, normalOpacity: .5, attackOpacity: .58, normalCount: 1 },
-    cannonball: { base: 8, velocityScale: .035, threshold: 0, normalOpacity: .42, attackOpacity: .62, normalCount: 2 },
-  };
-  const profile = trailProfiles[behaviorName] || trailProfiles.knife;
-  const visible = profile.normalCount > 0 || attacking || velocity >= profile.threshold;
-  const opacity = attacking ? profile.attackOpacity : profile.normalOpacity;
-  let rearX = -enemy.vx / velocity;
-  let rearY = -enemy.vy / velocity;
-  if (behaviorName === 'axe') {
-    const spin = (enemy.spinAngle || 0) * Math.PI / 180;
-    // The streak follows the rotating lower blade end, rather than the old travel vector.
-    rearX = -Math.sin(spin);
-    rearY = Math.cos(spin);
-  }
+function getEnemyCollisionBoxes(enemy) {
+  return enemy.collisionBoxes.map((box) => rotateEnemyBox(enemy, box));
+}
+
+function getEnemyVisualCenter(enemy) {
   const bounds = getEnemySpriteBounds(enemy);
-  const localLeft = bounds.left - enemy.x;
-  const localTop = bounds.top - enemy.y;
-  const localRight = bounds.right - enemy.x;
-  const localBottom = bounds.bottom - enemy.y;
-  const centerX = (localLeft + localRight) / 2;
-  const centerY = (localTop + localBottom) / 2;
-  const halfWidth = (localRight - localLeft) / 2;
-  const halfHeight = (localBottom - localTop) / 2;
-  const trailLength = Math.max(4, Math.min(34, Math.round(profile.base + velocity * profile.velocityScale * (attacking ? 1.2 : .7))));
-  let attachX;
-  let attachY;
-  if (behaviorName === 'axe') {
-    // Axe rotation is anchored at its visible center, so the long blade end is a fixed radius.
-    const spin = (enemy.spinAngle || 0) * Math.PI / 180;
-    attachX = centerX - Math.sin(spin) * halfHeight;
-    attachY = centerY + Math.cos(spin) * halfHeight;
-  } else {
-    const edgeDistance = Math.min(
-      Math.abs(rearX) > 0 ? halfWidth / Math.abs(rearX) : Infinity,
-      Math.abs(rearY) > 0 ? halfHeight / Math.abs(rearY) : Infinity,
-    );
-    attachX = centerX + rearX * edgeDistance;
-    attachY = centerY + rearY * edgeDistance;
+  return { x: (bounds.left + bounds.right) / 2, y: (bounds.top + bounds.bottom) / 2 };
+}
+
+function setEnemyVisualCenter(enemy, x, y) {
+  enemy.x = x - enemy.visualBounds.centerX;
+  enemy.y = y - enemy.visualBounds.centerY;
+  const actualCenter = getEnemyVisualCenter(enemy);
+  enemy.x += x - actualCenter.x;
+  enemy.y += y - actualCenter.y;
+}
+
+function setEnemyAngle(enemy, angle) {
+  const center = enemy.image ? getEnemyVisualCenter(enemy) : null;
+  enemy.angle = angle;
+  enemy.image.style.setProperty('--enemy-angle', `${Math.round(angle)}deg`);
+  if (center) setEnemyVisualCenter(enemy, center.x, center.y);
+}
+
+function easeEnemyAngle(enemy, targetAngle, response, delta) {
+  const difference = ((targetAngle - enemy.angle + 540) % 360) - 180;
+  setEnemyAngle(enemy, enemy.angle + difference * Math.min(1, response * delta));
+}
+
+function getTrailAnchor(enemy) {
+  const bounds = getEnemySpriteBounds(enemy);
+  const center = { x: (bounds.left + bounds.right) / 2, y: (bounds.top + bounds.bottom) / 2 };
+  const velocity = Math.hypot(enemy.vx, enemy.vy);
+  if (velocity < 1) return center;
+  const rearX = -enemy.vx / velocity;
+  const rearY = -enemy.vy / velocity;
+  const halfWidth = (bounds.right - bounds.left) / 2;
+  const halfHeight = (bounds.bottom - bounds.top) / 2;
+  const edgeDistance = Math.min(
+    Math.abs(rearX) > .001 ? halfWidth / Math.abs(rearX) : Infinity,
+    Math.abs(rearY) > .001 ? halfHeight / Math.abs(rearY) : Infinity,
+  );
+  return { x: center.x + rearX * edgeDistance, y: center.y + rearY * edgeDistance };
+}
+
+function updateEnemyTrail(enemy, now = performance.now()) {
+  if (!enemy.trail) return;
+  const trail = enemy.trail;
+  const activeState = trail.activeState;
+  const state = enemy.specialState || enemy.attackState;
+  const active = !enemy.retreating && (!activeState || state === activeState);
+  trail.points = trail.points.filter((point) => now - point.at <= trail.lifespan);
+  if (active && Math.hypot(enemy.vx, enemy.vy) > 8 && now - trail.lastSampleAt >= trail.sampleMs) {
+    trail.points.push({ ...getTrailAnchor(enemy), at: now });
+    if (trail.points.length > TRAIL_SEGMENT_LIMIT + 1) trail.points.shift();
+    trail.lastSampleAt = now;
   }
-  const angle = Math.atan2(attachY - centerY, attachX - centerX) - Math.PI;
-  enemy.trail.style.width = `${trailLength}px`;
-  enemy.trail.style.left = `${Math.round(attachX - trailLength)}px`;
-  enemy.trail.style.top = `${Math.round(attachY - 4)}px`;
-  enemy.trail.style.transform = `rotate(${angle}rad)`;
-  enemy.trail.style.opacity = profile.trailEnabled === false ? '0' : visible ? opacity : '0';
-  const lengthsByType = {
-    scissor: [trailLength, Math.round(trailLength * .42), Math.round(trailLength * .22)],
-    knife: [trailLength, Math.round(trailLength * .52), Math.round(trailLength * .3)],
-    axe: [trailLength, Math.round(trailLength * .66), Math.round(trailLength * .38)],
-    arrow: [trailLength, 0, 0],
-    cannonball: [trailLength, Math.round(trailLength * .48), 0],
-  };
-  const lengths = lengthsByType[behaviorName] || lengthsByType.knife;
-  const rights = behaviorName === 'arrow' ? [0, 0, 0] : behaviorName === 'cannonball' ? [0, 4, 0] : [0, 3, 6];
-  const tops = behaviorName === 'axe' ? [3, 0, 7] : [3, 0, 7];
-  const activeCount = attacking ? 3 : profile.normalCount;
-  enemy.trailNodes.forEach((trailNode, index) => {
-    trailNode.style.display = visible && index < activeCount ? 'block' : 'none';
-    trailNode.style.width = `${lengths[index]}px`;
-    trailNode.style.right = `${rights[index]}px`;
-    trailNode.style.top = `${tops[index]}px`;
+  trail.node.setAttribute('viewBox', `0 0 ${playfield.clientWidth} ${playfield.clientHeight}`);
+  trail.lines.forEach((line, index) => {
+    const from = trail.points[index];
+    const to = trail.points[index + 1];
+    if (!from || !to) {
+      line.style.display = 'none';
+      return;
+    }
+    const age = now - to.at;
+    const life = Math.max(0, 1 - age / trail.lifespan);
+    const taper = (index + 1) / Math.max(1, trail.points.length - 1);
+    line.style.display = 'block';
+    line.setAttribute('x1', from.x.toFixed(1));
+    line.setAttribute('y1', from.y.toFixed(1));
+    line.setAttribute('x2', to.x.toFixed(1));
+    line.setAttribute('y2', to.y.toFixed(1));
+    line.setAttribute('stroke-width', Math.max(.5, trail.width * taper).toFixed(2));
+    line.setAttribute('opacity', (trail.opacity * life * taper).toFixed(3));
   });
+}
+
+function renderEnemy(enemy, now = performance.now()) {
+  enemy.node.style.transform = `translate(${Math.round(enemy.x)}px, ${Math.round(enemy.y)}px)`;
+  if (enemy.warningNode) {
+    const center = getEnemyVisualCenter(enemy);
+    enemy.warningNode.style.left = `${Math.round(center.x)}px`;
+  }
+  updateEnemyTrail(enemy, now);
+}
+
+function removeEnemyVisual(enemy) {
+  enemy.node.remove();
+  if (enemy.explosionNode) enemy.explosionNode.remove();
+  if (enemy.warningNode) enemy.warningNode.remove();
+  if (enemy.trail) enemy.trail.node.remove();
+}
+
+function emitEnemyImpact(x, y, type = 'spark') {
+  const impact = document.createElement('i');
+  impact.className = `enemy-impact enemy-impact-${type}`;
+  impact.style.left = `${Math.round(x)}px`;
+  impact.style.top = `${Math.round(y)}px`;
+  enemyLayer.append(impact);
+  window.setTimeout(() => impact.remove(), 260);
 }
 
 function spawnPowerup() {
   const roll = Math.random();
-  const type = roll < 1 / 3 ? 'growth' : roll < 2 / 3 ? 'shield' : 'ammo';
+  const type = roll < .25 ? 'growth' : roll < .5 ? 'shield' : roll < .75 ? 'ammo' : 'spread';
+  const visual = POWERUP_VISUALS[type];
   const powerup = { type, x: randomBetween(POWERUP_SIZE / 2, playfield.clientWidth - POWERUP_SIZE / 2), y: -POWERUP_SIZE, speed: randomBetween(35, 55), node: document.createElement('div') };
   powerup.node.className = 'powerup';
-  powerup.node.setAttribute('aria-label', type === 'growth' ? 'Growth powerup' : type === 'shield' ? 'Shield powerup' : 'Ammo pack');
+  powerup.node.style.setProperty('--powerup-render-size', `${visual.renderSize}px`);
+  powerup.node.setAttribute('aria-label', type === 'growth' ? 'Growth powerup' : type === 'shield' ? 'Shield powerup' : type === 'ammo' ? 'Ammo pack' : 'Spread shot powerup');
   const image = document.createElement('img');
-  image.src = type === 'growth' ? GROWTH_POWERUP_IMAGE : type === 'shield' ? SHIELD_POWERUP_IMAGE : AMMO_PACK_IMAGE;
+  image.src = visual.src;
   image.alt = '';
   image.width = POWERUP_SIZE;
   image.height = POWERUP_SIZE;
   powerup.node.append(image);
   powerupLayer.append(powerup.node);
   powerups.push(powerup);
+  if (wave === 1) waveOnePowerupSpawned = true;
 }
 
 function beginEnemyStrike(enemy, now) {
-  if (enemy.attackState !== 'approach' || now < enemy.attackReadyAt || !enemy.canStrike) return false;
+  if (enemy.definition.name !== 'knife' || enemy.attackState !== 'approach' || now < enemy.attackReadyAt || !enemy.canStrike) return false;
   const tuning = getWaveTuning();
-  const behavior = enemy.behavior;
   const bounds = getEnemySpriteBounds(enemy);
-  const localCenterX = (bounds.left + bounds.right) / 2 - enemy.x;
-  const localBottom = bounds.bottom - enemy.y;
+  const centerX = (bounds.left + bounds.right) / 2;
+  const centerY = (bounds.top + bounds.bottom) / 2;
   const { halfHeight } = getPlayerPixelBounds(now);
   enemy.attackState = 'telegraph';
   enemy.attackStartedAt = now;
-  enemy.telegraphMs = Math.round(tuning.telegraphMs * behavior.telegraphScale);
-  enemy.recoveryMs = Math.round(tuning.recoveryMs * behavior.recoveryScale);
-  enemy.strikeMs = Math.round(tuning.strikeMs * behavior.strikeScale);
-  enemy.strikeStartX = enemy.x;
-  enemy.strikeStartY = enemy.y;
-  enemy.strikeTargetX = playerPosition.x - localCenterX;
-  const strikeTargetY = playerPosition.y - halfHeight - localBottom + 2;
-  // The knife is a one-way top-down threat: its wind-up and lunge never reverse upward.
-  enemy.strikeTargetY = behavior.name === 'knife' ? Math.max(enemy.y, strikeTargetY) : strikeTargetY;
-  enemy.strikeOvershoot = behavior.name === 'sickle' ? 36 : 0;
+  enemy.telegraphMs = Math.round(tuning.telegraphMs * enemy.definition.telegraphScale);
+  enemy.recoveryMs = Math.round(tuning.recoveryMs * enemy.definition.recoveryScale);
+  enemy.strikeMs = Math.round(tuning.strikeMs * enemy.definition.strikeScale);
+  enemy.telegraphOriginX = enemy.x;
+  enemy.telegraphOriginY = enemy.y;
+  enemy.telegraphPullbackX = -Math.sign(playerPosition.x - centerX || 1) * 12;
+  enemy.lockedTargetX = playerPosition.x;
+  enemy.lockedTargetY = playerPosition.y - halfHeight;
+  enemy.strikeTargetX = enemy.lockedTargetX - enemy.visualBounds.centerX;
+  enemy.strikeTargetY = Math.max(enemy.y, enemy.lockedTargetY - enemy.visualBounds.bottom + 2);
+  enemy.lockedAimAngle = Math.max(-58, Math.min(58, Math.atan2(enemy.lockedTargetX - centerX, enemy.lockedTargetY - centerY) * 180 / Math.PI));
   enemy.node.classList.add('is-telegraph');
   return true;
 }
@@ -726,44 +954,15 @@ function updateEnemyStrike(enemy, delta, now) {
   const tuning = getWaveTuning();
   if (enemy.attackState === 'telegraph') {
     const progress = Math.min(1, (now - enemy.attackStartedAt) / enemy.telegraphMs);
-    const telegraphOffsets = {
-      knife: [-12, 0],
-      sickle: [0, -9],
-    };
-    const [offsetX, offsetY] = telegraphOffsets[enemy.behavior.name] || [0, -6];
+    const pullback = easeEntry(Math.min(1, progress * 2.4));
     enemy.vx = 0;
     enemy.vy = 0;
-    enemy.x = Math.round(enemy.strikeStartX + offsetX * Math.min(1, progress * 3));
-    const telegraphY = enemy.strikeStartY + offsetY * Math.min(1, progress * 3);
-    enemy.y = enemy.behavior.name === 'knife'
-      ? Math.max(enemy.strikeStartY, Math.round(telegraphY))
-      : Math.round(telegraphY);
-    if (enemy.behavior.name === 'scissor') {
-      enemy.image.style.setProperty('--enemy-scale-x', `${1.12 + Math.min(.2, progress * .2)}`);
-    } else if (enemy.behavior.name === 'knife') {
-      const boundsCenterX = (getEnemySpriteBounds(enemy).left + getEnemySpriteBounds(enemy).right) / 2;
-      const boundsCenterY = (getEnemySpriteBounds(enemy).top + getEnemySpriteBounds(enemy).bottom) / 2;
-      const aimAngle = Math.max(-58, Math.min(58, Math.atan2(playerPosition.x - boundsCenterX, playerPosition.y - boundsCenterY) * 180 / Math.PI));
-      enemy.image.style.setProperty('--enemy-angle', `${Math.round(aimAngle)}deg`);
-    }
-    if (enemy.behavior.name === 'sickle') {
-      enemy.image.style.setProperty('--enemy-angle', `${Math.round(-42 - progress * 18)}deg`);
-    }
+    enemy.x = Math.round(enemy.telegraphOriginX + enemy.telegraphPullbackX * pullback);
+    enemy.y = enemy.telegraphOriginY;
+    setEnemyAngle(enemy, enemy.lockedAimAngle);
     if (progress >= 1) {
-      const bounds = getEnemySpriteBounds(enemy);
-      const localCenterX = (bounds.left + bounds.right) / 2 - enemy.x;
-      const localBottom = bounds.bottom - enemy.y;
-      const { halfHeight } = getPlayerPixelBounds(now);
       enemy.strikeStartX = enemy.x;
       enemy.strikeStartY = enemy.y;
-      const aimX = enemy.behavior.name === 'sickle'
-        ? enemy.sweepDirection
-        : Math.sign(playerPosition.x - (bounds.left + bounds.right) / 2) || 1;
-      enemy.strikeTargetX = playerPosition.x - localCenterX + aimX * enemy.strikeOvershoot;
-      const strikeTargetY = playerPosition.y - halfHeight - localBottom + 2;
-      enemy.strikeTargetY = enemy.behavior.name === 'knife'
-        ? Math.max(enemy.strikeStartY, strikeTargetY)
-        : strikeTargetY;
       enemy.attackState = 'strike';
       enemy.attackStartedAt = now;
       enemy.node.classList.remove('is-telegraph');
@@ -776,164 +975,432 @@ function updateEnemyStrike(enemy, delta, now) {
     const progress = Math.min(1, (now - enemy.attackStartedAt) / strikeMs);
     enemy.vx = (enemy.strikeTargetX - enemy.strikeStartX) / (strikeMs / 1000);
     enemy.vy = (enemy.strikeTargetY - enemy.strikeStartY) / (strikeMs / 1000);
-    const sweepOffset = enemy.behavior.name === 'sickle'
-      ? Math.sin(progress * Math.PI) * 42 * enemy.sweepDirection
-      : 0;
-    enemy.x = Math.round(enemy.strikeStartX + (enemy.strikeTargetX - enemy.strikeStartX) * progress + sweepOffset);
+    enemy.x = Math.round(enemy.strikeStartX + (enemy.strikeTargetX - enemy.strikeStartX) * progress);
     const strikeY = enemy.strikeStartY + (enemy.strikeTargetY - enemy.strikeStartY) * progress;
-    enemy.y = enemy.behavior.name === 'knife'
-      ? Math.max(enemy.strikeStartY, Math.round(strikeY))
-      : Math.round(strikeY);
-    if (enemy.behavior.name === 'sickle') {
-      enemy.image.style.setProperty('--enemy-angle', `${Math.round(-60 + progress * 150)}deg`);
-    }
+    enemy.y = Math.max(enemy.strikeStartY, Math.round(strikeY));
     if (progress >= 1) {
       enemy.attackState = 'recover';
       enemy.strikeContactPending = true;
       enemy.recoveryUntil = now + enemy.recoveryMs;
       enemy.attackReadyAt = enemy.recoveryUntil;
-    enemy.node.classList.remove('is-striking');
-    enemy.node.classList.add('is-recovering');
+      enemy.node.classList.remove('is-striking');
+      enemy.node.classList.add('is-recovering');
       enemy.image.style.setProperty('--enemy-scale-x', '1');
     }
     return;
   }
-  enemy.vx = enemy.behavior.name === 'axe' ? enemy.wallVx : 0;
+  enemy.vx = 0;
   enemy.vy = enemy.speed * .2;
-  if (enemy.behavior.name === 'axe') {
-    enemy.x += enemy.vx * delta;
-    const spriteScale = enemy.size / 50;
-    const leftWall = -enemy.type.alphaBounds[0] * spriteScale;
-    const rightWall = playfield.clientWidth - enemy.type.alphaBounds[2] * spriteScale;
-    if (enemy.x <= leftWall && enemy.wallVx < 0) {
-      enemy.x = Math.round(leftWall);
-      enemy.wallVx = Math.abs(enemy.wallVx);
-      enemy.vx = enemy.wallVx;
-    } else if (enemy.x >= rightWall && enemy.wallVx > 0) {
-      enemy.x = Math.round(rightWall);
-      enemy.wallVx = -Math.abs(enemy.wallVx);
-      enemy.vx = enemy.wallVx;
-    }
-  }
   enemy.y += enemy.vy * delta;
   if (enemy.attackState === 'recover' && now >= enemy.recoveryUntil) {
     enemy.attackState = 'approach';
     enemy.attackReadyAt = now + tuning.attackDelay;
     enemy.node.classList.remove('is-recovering');
+    setEnemyAngle(enemy, 0);
   }
 }
 
-function updateEnemyMovement(enemy, delta, now) {
+function finishEnemyEntry(enemy, now) {
+  if (now < enemy.entryReadyAt) {
+    enemy.vx = 0;
+    enemy.vy = 0;
+    return false;
+  }
+  if (enemy.entryPending) {
+    enemy.entryPending = false;
+    if (enemy.warningNode) {
+      enemy.warningNode.remove();
+      enemy.warningNode = null;
+    }
+  }
+  return true;
+}
+
+function updateArrow(enemy, delta, now) {
+  if (!finishEnemyEntry(enemy, now)) return;
+  enemy.vx = 0;
+  enemy.vy = enemy.speed;
+  enemy.y += enemy.vy * delta;
+}
+
+function updateKnife(enemy, delta, now) {
+  if (!finishEnemyEntry(enemy, now)) return;
   if (enemy.attackState !== 'approach') {
     updateEnemyStrike(enemy, delta, now);
     return;
   }
-  const tuning = getWaveTuning();
-  const bounds = getEnemySpriteBounds(enemy);
-  const centerX = (bounds.left + bounds.right) / 2;
-  const deltaX = Math.max(-160, Math.min(160, playerPosition.x - centerX));
-  enemy.image.style.setProperty('--enemy-scale-x', '1');
-  switch (enemy.behavior.name) {
-    case 'scissor':
-      enemy.vx = Math.sin(now * .007 + enemy.phase) * (76 + wave * 4);
-      enemy.vy = enemy.speed * 1.08;
-      break;
-    case 'knife':
-      enemy.vx = enemy.lockOn && enemy.y > playerPosition.y - 280
-        ? deltaX * .62
-        : Math.sin(now * .0017 + enemy.phase) * 22;
-      enemy.vy = enemy.speed * .96;
-      enemy.image.style.setProperty('--enemy-angle', '0deg');
-      break;
-    case 'axe':
-      enemy.vx = enemy.wallVx;
-      enemy.vy = enemy.speed * 2.35 * enemy.downwardScale;
-      enemy.spinAngle = (now * 1.89 + enemy.phase * 30) % 360;
-      enemy.image.style.setProperty('--enemy-angle', `${Math.round(enemy.spinAngle)}deg`);
-      break;
-    case 'arrow':
-      enemy.vx = 0;
-      enemy.vy = enemy.speed * 1.08;
-      break;
-    case 'cannonball':
-      enemy.vx = 0;
-      enemy.vy = enemy.speed;
-      break;
-    case 'sickle':
-      {
-        const sickleClock = (now + enemy.phase * 1000) % SICKLE_BURST_CYCLE_MS;
-        const sickleCycle = Math.floor((now + enemy.phase * 1000) / SICKLE_BURST_CYCLE_MS);
-        const burstProgress = Math.min(1, sickleClock / SICKLE_BURST_MS);
-        const burstDirection = sickleCycle % 2 === 0 ? 1 : -1;
-        const burstActive = sickleClock < SICKLE_BURST_MS;
-        enemy.vx = burstActive ? burstDirection * (235 + wave * 5) : 0;
-        enemy.vy = burstActive ? enemy.speed * 2.15 : 0;
-        // Each burst reverses the blade through a wide arc around the handle endpoint.
-        const swipeStart = -burstDirection * SICKLE_SWIPE_ANGLE;
-        const swipeEnd = burstDirection * SICKLE_SWIPE_ANGLE;
-        const swipeAngle = swipeStart + (swipeEnd - swipeStart) * burstProgress;
-        enemy.image.style.setProperty('--enemy-angle', `${Math.round(swipeAngle)}deg`);
-      }
-      break;
-    default:
-      enemy.vx = 0;
-      enemy.vy = enemy.speed;
-  }
+  const center = getEnemyVisualCenter(enemy);
+  const deltaX = Math.max(-160, Math.min(160, playerPosition.x - center.x));
+  enemy.vx = enemy.lockOn && center.y > playerPosition.y - 280
+    ? deltaX * .62
+    : Math.sin((now - enemy.spawnedAt) * .0017 + enemy.phase) * 22;
+  enemy.vy = enemy.speed * .96;
   enemy.x += enemy.vx * delta;
-  const nextY = enemy.y + enemy.vy * delta;
-  enemy.y = enemy.behavior.name === 'knife' ? Math.max(enemy.y, nextY) : nextY;
-  if (enemy.behavior.name === 'axe') {
-    const spriteScale = enemy.size / 50;
-    const leftWall = -enemy.type.alphaBounds[0] * spriteScale;
-    const rightWall = playfield.clientWidth - enemy.type.alphaBounds[2] * spriteScale;
-    if (enemy.x <= leftWall && enemy.wallVx < 0) {
-      enemy.x = Math.round(leftWall);
-      enemy.wallVx = Math.abs(enemy.wallVx);
-      enemy.vx = enemy.wallVx;
-    } else if (enemy.x >= rightWall && enemy.wallVx > 0) {
-      enemy.x = Math.round(rightWall);
-      enemy.wallVx = -Math.abs(enemy.wallVx);
-      enemy.vx = enemy.wallVx;
-    }
-  }
-  const boundsAfterMove = getEnemySpriteBounds(enemy);
-  const centerAfterMove = (boundsAfterMove.left + boundsAfterMove.right) / 2;
-  const distanceToPlayer = Math.hypot(playerPosition.x - centerAfterMove, playerPosition.y - (boundsAfterMove.top + boundsAfterMove.bottom) / 2);
-  if (enemy.canStrike && now >= enemy.attackReadyAt && distanceToPlayer <= enemy.behavior.attackDistance + tuning.strikeDistance * .35) {
+  enemy.y += enemy.vy * delta;
+  setEnemyAngle(enemy, 0);
+  const distanceToPlayer = Math.hypot(playerPosition.x - center.x, playerPosition.y - center.y);
+  if (enemy.canStrike && now >= enemy.attackReadyAt && distanceToPlayer <= enemy.definition.attackDistance + getWaveTuning().strikeDistance * .35) {
     beginEnemyStrike(enemy, now);
   }
-  if (enemy.x < -enemy.size * 1.5) enemy.x = -enemy.size * 1.5;
-  if (enemy.x > playfield.clientWidth + enemy.size * .5) enemy.x = playfield.clientWidth + enemy.size * .5;
+}
+
+function updateScissor(enemy, delta, now) {
+  if (!finishEnemyEntry(enemy, now)) return;
+  const center = getEnemyVisualCenter(enemy);
+  const elapsed = now - enemy.entryReadyAt;
+  const desiredX = Math.max(enemy.visualBounds.width / 2, Math.min(
+    playfield.clientWidth - enemy.visualBounds.width / 2,
+    enemy.weaveCenterX + Math.sin(elapsed * enemy.weaveRate) * enemy.weaveAmplitude,
+  ));
+  enemy.vx = delta > 0 ? (desiredX - center.x) / delta : 0;
+  enemy.vy = enemy.speed;
+  setEnemyVisualCenter(enemy, desiredX, center.y + enemy.vy * delta);
+  setEnemyAngle(enemy, Math.max(-9, Math.min(9, enemy.vx * .045)));
+}
+
+function updateCannonball(enemy, delta, now) {
+  if (!finishEnemyEntry(enemy, now)) return;
+  enemy.vx = 0;
+  enemy.vy = enemy.speed;
+  enemy.y += enemy.vy * delta;
+}
+
+function updateFork(enemy, delta, now) {
+  if (!finishEnemyEntry(enemy, now)) return;
+  const center = getEnemyVisualCenter(enemy);
+  const elapsed = now - enemy.spawnedAt;
+  const desiredX = Math.max(enemy.visualBounds.width / 2, Math.min(
+    playfield.clientWidth - enemy.visualBounds.width / 2,
+    enemy.weaveCenterX + (Math.sin(elapsed * .00115 + enemy.phase) - Math.sin(enemy.phase)) * 38,
+  ));
+  enemy.vx = delta > 0 ? (desiredX - center.x) / delta : 0;
+  enemy.vy = enemy.speed;
+  setEnemyVisualCenter(enemy, desiredX, center.y + enemy.vy * delta);
+  setEnemyAngle(enemy, Math.sin(elapsed * .00115 + enemy.phase) * 8);
+}
+
+function updateReboundEnemy(enemy, delta, now, mobile = false) {
+  if (!finishEnemyEntry(enemy, now)) return;
+  const speedScale = enemy.reboundSpeedScale || 1;
+  enemy.vx = enemy.wallVx * speedScale;
+  enemy.vy = enemy.speed * (mobile ? .72 : 1.18) * speedScale;
+  enemy.x += enemy.vx * delta;
+  enemy.y += enemy.vy * delta;
+  setEnemyAngle(enemy, enemy.angle + (mobile ? 680 : 390) * delta * Math.sign(enemy.vx || 1));
+  const bounds = getEnemySpriteBounds(enemy);
+  const hitLeft = bounds.left <= 0 && enemy.vx < 0;
+  const hitRight = bounds.right >= playfield.clientWidth && enemy.vx > 0;
+  if (!hitLeft && !hitRight) return;
+  if (enemy.bounceCount >= enemy.maxBounces) {
+    enemy.exitingSide = true;
+    return;
+  }
+  enemy.x += hitLeft ? -bounds.left : playfield.clientWidth - bounds.right;
+  enemy.wallVx = hitLeft ? Math.abs(enemy.wallVx) : -Math.abs(enemy.wallVx);
+  enemy.vx = enemy.wallVx * speedScale;
+  enemy.bounceCount += 1;
+  if (mobile) enemy.reboundSpeedScale = Math.min(1.28, speedScale * 1.08);
+  emitEnemyImpact(hitLeft ? 2 : playfield.clientWidth - 2, (bounds.top + bounds.bottom) / 2);
+}
+
+function updateAxe(enemy, delta, now) {
+  updateReboundEnemy(enemy, delta, now, false);
+}
+
+function updateSawblade(enemy, delta, now) {
+  updateReboundEnemy(enemy, delta, now, true);
+}
+
+function cubicPoint(path, progress) {
+  const inverse = 1 - progress;
+  return {
+    x: inverse ** 3 * path[0].x + 3 * inverse ** 2 * progress * path[1].x + 3 * inverse * progress ** 2 * path[2].x + progress ** 3 * path[3].x,
+    y: inverse ** 3 * path[0].y + 3 * inverse ** 2 * progress * path[1].y + 3 * inverse * progress ** 2 * path[2].y + progress ** 3 * path[3].y,
+  };
+}
+
+function beginSickleWindup(enemy, now) {
+  const center = getEnemyVisualCenter(enemy);
+  const direction = enemy.sweepDirection;
+  const targetX = Math.max(95, Math.min(playfield.clientWidth - 95, playerPosition.x));
+  const targetY = Math.max(center.y + 150, Math.min(playfield.clientHeight - 110, playerPosition.y - 18));
+  const start = { x: center.x - direction * 22, y: center.y - 10 };
+  enemy.specialState = 'windup';
+  enemy.stateStartedAt = now;
+  enemy.windupStart = center;
+  enemy.sweepPath = [
+    start,
+    { x: start.x + direction * 80, y: start.y + 18 },
+    { x: targetX + direction * 165, y: targetY - 120 },
+    { x: targetX - direction * 145, y: targetY + 105 },
+  ];
+  enemy.node.classList.add('is-sickle-windup');
+}
+
+function updateSickle(enemy, delta, now) {
+  if (!finishEnemyEntry(enemy, now)) return;
+  const center = getEnemyVisualCenter(enemy);
+  if (enemy.specialState === 'entry') {
+    enemy.vx = enemy.sweepDirection * 54;
+    enemy.vy = enemy.speed;
+    setEnemyVisualCenter(enemy, center.x + enemy.vx * delta, center.y + enemy.vy * delta);
+    easeEnemyAngle(enemy, Math.atan2(enemy.vy, enemy.vx) * 180 / Math.PI + enemy.definition.rotationOffset, 10, delta);
+    if (center.y >= Math.max(135, playerPosition.y - 300)) beginSickleWindup(enemy, now);
+    return;
+  }
+  if (enemy.specialState === 'windup') {
+    const progress = Math.min(1, (now - enemy.stateStartedAt) / 360);
+    const eased = easeEntry(progress);
+    const start = enemy.windupStart;
+    const end = enemy.sweepPath[0];
+    enemy.vx = (end.x - start.x) / .36;
+    enemy.vy = (end.y - start.y) / .36;
+    setEnemyVisualCenter(enemy, start.x + (end.x - start.x) * eased, start.y + (end.y - start.y) * eased);
+    const pathStart = cubicPoint(enemy.sweepPath, 0);
+    const pathNext = cubicPoint(enemy.sweepPath, .012);
+    const tangentAngle = Math.atan2(pathNext.y - pathStart.y, pathNext.x - pathStart.x) * 180 / Math.PI;
+    easeEnemyAngle(enemy, tangentAngle + enemy.definition.rotationOffset, 12, delta);
+    if (progress >= 1) {
+      enemy.specialState = 'sweep';
+      enemy.stateStartedAt = now;
+      enemy.node.classList.remove('is-sickle-windup');
+      enemy.node.classList.add('is-sickle-sweeping');
+    }
+    return;
+  }
+  if (enemy.specialState === 'sweep') {
+    const duration = 900;
+    const progress = Math.min(1, (now - enemy.stateStartedAt) / duration);
+    const position = cubicPoint(enemy.sweepPath, progress);
+    const tangentProgress = Math.min(.988, progress);
+    const tangentPosition = cubicPoint(enemy.sweepPath, tangentProgress);
+    const nextPosition = cubicPoint(enemy.sweepPath, tangentProgress + .012);
+    const directionX = nextPosition.x - tangentPosition.x;
+    const directionY = nextPosition.y - tangentPosition.y;
+    enemy.vx = directionX / (.012 * duration / 1000);
+    enemy.vy = directionY / (.012 * duration / 1000);
+    setEnemyVisualCenter(enemy, position.x, position.y);
+    easeEnemyAngle(enemy, Math.atan2(directionY, directionX) * 180 / Math.PI + enemy.definition.rotationOffset, 18, delta);
+    if (progress >= 1) {
+      const magnitude = Math.hypot(enemy.vx, enemy.vy) || 1;
+      enemy.exitVx = enemy.vx / magnitude * 240;
+      enemy.exitVy = Math.max(150, enemy.vy / magnitude * 240);
+      enemy.specialState = 'exit';
+      enemy.node.classList.remove('is-sickle-sweeping');
+    }
+    return;
+  }
+  enemy.vx = enemy.exitVx;
+  enemy.vy = enemy.exitVy;
+  enemy.x += enemy.vx * delta;
+  enemy.y += enemy.vy * delta;
+}
+
+function positionBombExplosionFrame(enemy, frame) {
+  const scale = BOMB_EXPLOSION_SIZE / 48;
+  const bounds = frame.alphaBounds;
+  const centerX = bounds ? (bounds[0] + bounds[2]) / 2 : 24;
+  const centerY = bounds ? (bounds[1] + bounds[3]) / 2 : 24;
+  enemy.explosionNode.style.left = `${enemy.detonationX - centerX * scale}px`;
+  enemy.explosionNode.style.top = `${enemy.detonationY - centerY * scale}px`;
+  enemy.explosionNode.src = frame.src;
+}
+
+function beginBombExplosion(enemy, now) {
+  const center = getEnemyVisualCenter(enemy);
+  enemy.specialState = 'explosion';
+  enemy.exploded = true;
+  enemy.detonationX = center.x;
+  enemy.detonationY = center.y;
+  enemy.explosionStartedAt = now;
+  enemy.explosionFrame = 0;
+  enemy.node.classList.remove('is-bomb-warning', 'is-bomb-critical');
+  enemy.node.classList.add('is-bomb-exploding');
+  enemy.explosionNode = document.createElement('img');
+  enemy.explosionNode.className = 'enemy-explosion';
+  enemy.explosionNode.alt = '';
+  enemy.explosionNode.width = BOMB_EXPLOSION_SIZE;
+  enemy.explosionNode.height = BOMB_EXPLOSION_SIZE;
+  positionBombExplosionFrame(enemy, BOMB_EXPLOSION_FRAMES[0]);
+  enemyLayer.append(enemy.explosionNode);
+  triggerFatalImpactShake();
+}
+
+function updateBomb(enemy, delta, now) {
+  if (!finishEnemyEntry(enemy, now)) return;
+  if (enemy.specialState === 'explosion') {
+    enemy.vx = 0;
+    enemy.vy = 0;
+    if (!enemy.explosionChecked) {
+      enemy.explosionChecked = true;
+      const { halfWidth, halfHeight } = getPlayerPixelBounds(now);
+      const distance = Math.hypot(playerPosition.x - enemy.detonationX, playerPosition.y - enemy.detonationY);
+      if (distance <= 74 + Math.max(halfWidth, halfHeight)) {
+        if (hearts === 1 && shieldedUntil <= now && invulnerableUntil <= now) beginFatalSequence(enemy, now);
+        else damagePlayer(now);
+      }
+    }
+    const frameIndex = Math.floor((now - enemy.explosionStartedAt) / BOMB_EXPLOSION_FRAME_MS);
+    if (frameIndex >= BOMB_EXPLOSION_FRAMES.length) {
+      enemy.explosionNode.remove();
+      enemy.explosionNode = null;
+      enemy.expired = true;
+    } else if (frameIndex !== enemy.explosionFrame) {
+      enemy.explosionFrame = frameIndex;
+      positionBombExplosionFrame(enemy, BOMB_EXPLOSION_FRAMES[frameIndex]);
+    }
+    return;
+  }
+  const fuseProgress = 1 - Math.max(0, enemy.fuseEndsAt - now) / enemy.definition.fuseMs;
+  enemy.node.classList.toggle('is-bomb-warning', fuseProgress >= .55);
+  enemy.node.classList.toggle('is-bomb-critical', fuseProgress >= .8);
+  enemy.vx = Math.sin((now - enemy.spawnedAt) * .0014 + enemy.phase) * 18;
+  enemy.vy = enemy.speed;
+  enemy.x += enemy.vx * delta;
+  enemy.y += enemy.vy * delta;
+  if (now >= enemy.fuseEndsAt) beginBombExplosion(enemy, now);
+}
+
+function updateHammer(enemy, delta, now) {
+  if (!finishEnemyEntry(enemy, now)) return;
+  const center = getEnemyVisualCenter(enemy);
+  if (enemy.specialState === 'tracking') {
+    const dx = playerPosition.x - center.x;
+    enemy.vx = Math.max(-145, Math.min(145, dx * 2.2));
+    enemy.vy = 0;
+    setEnemyVisualCenter(enemy, center.x + enemy.vx * delta, 50 + Math.sin((now - enemy.spawnedAt) * .006) * 3);
+    const trackedCenter = getEnemyVisualCenter(enemy);
+    const trackingAngle = Math.atan2(playerPosition.y - trackedCenter.y, playerPosition.x - trackedCenter.x) * 180 / Math.PI;
+    easeEnemyAngle(enemy, trackingAngle + enemy.definition.rotationOffset, 9, delta);
+    if (now - enemy.stateStartedAt >= 1100) {
+      enemy.specialState = 'lock';
+      enemy.stateStartedAt = now;
+      enemy.lockedLaneX = playerPosition.x;
+      enemy.lockedTargetX = playerPosition.x;
+      enemy.lockedTargetY = playerPosition.y;
+      enemy.lockedSlamAngle = Math.atan2(enemy.lockedTargetY - 38, enemy.lockedTargetX - enemy.lockedLaneX) * 180 / Math.PI
+        + enemy.definition.rotationOffset;
+      const warning = document.createElement('i');
+      warning.className = 'enemy-entry-warning enemy-entry-warning-hammer';
+      warning.style.left = `${Math.round(enemy.lockedLaneX)}px`;
+      enemy.warningNode = warning;
+      enemyLayer.append(warning);
+      enemy.node.classList.add('is-hammer-locked');
+    }
+    return;
+  }
+  if (enemy.specialState === 'lock') {
+    const progress = Math.min(1, (now - enemy.stateStartedAt) / 330);
+    enemy.vx = 0;
+    enemy.vy = 0;
+    setEnemyVisualCenter(enemy, enemy.lockedLaneX, 50 - easeEntry(progress) * 12);
+    easeEnemyAngle(enemy, enemy.lockedSlamAngle, 14, delta);
+    if (progress >= 1) {
+      enemy.specialState = 'slam';
+      enemy.stateStartedAt = now;
+      enemy.node.classList.remove('is-hammer-locked');
+      enemy.node.classList.add('is-hammer-slamming');
+      if (enemy.warningNode) {
+        enemy.warningNode.remove();
+        enemy.warningNode = null;
+      }
+    }
+    return;
+  }
+  if (enemy.specialState === 'slam') {
+    enemy.vx = 0;
+    enemy.vy = 680 * getEnemySpeedMultiplier(enemy.definition);
+    setEnemyAngle(enemy, enemy.lockedSlamAngle);
+    enemy.y += enemy.vy * delta;
+    const bounds = getEnemySpriteBounds(enemy);
+    if (bounds.bottom >= playfield.clientHeight - 5) {
+      enemy.y -= bounds.bottom - (playfield.clientHeight - 5);
+      enemy.specialState = 'impact';
+      enemy.stateStartedAt = now;
+      enemy.harmless = true;
+      enemy.node.classList.remove('is-hammer-slamming');
+      enemy.node.classList.add('is-hammer-impact');
+      emitEnemyImpact(enemy.lockedLaneX, playfield.clientHeight - 6, 'heavy');
+      triggerFatalImpactShake();
+    }
+    return;
+  }
+  if (enemy.specialState === 'impact') {
+    enemy.vx = 0;
+    enemy.vy = 0;
+    if (now - enemy.stateStartedAt >= 340) {
+      enemy.specialState = 'retreat';
+      enemy.node.classList.remove('is-hammer-impact');
+    }
+    return;
+  }
+  enemy.vx = 0;
+  enemy.vy = -250;
+  enemy.y += enemy.vy * delta;
+  if (getEnemySpriteBounds(enemy).bottom < -8) enemy.expired = true;
+}
+
+const ENEMY_UPDATERS = {
+  arrow: updateArrow,
+  knife: updateKnife,
+  scissor: updateScissor,
+  cannonball: updateCannonball,
+  fork: updateFork,
+  axe: updateAxe,
+  sawblade: updateSawblade,
+  sickle: updateSickle,
+  bomb: updateBomb,
+  hammer: updateHammer,
+};
+
+function updateRetreatingEnemy(enemy, delta) {
+  enemy.vx = enemy.retreatVx;
+  enemy.vy = enemy.retreatVy;
+  enemy.x += enemy.vx * delta;
+  enemy.y += enemy.vy * delta;
+}
+
+function updateEnemyMovement(enemy, delta, now) {
+  if (enemy.retreating) {
+    updateRetreatingEnemy(enemy, delta);
+    return;
+  }
+  ENEMY_UPDATERS[enemy.definition.name](enemy, delta, now);
+}
+
+function rectanglesOverlap(first, second) {
+  return first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top;
 }
 
 function hitTest(projectile, enemy) {
-  const projectileHeight = projectile.height;
-  const bounds = getEnemySpriteBounds(enemy);
-  const enemyLeft = bounds.left;
-  const enemyRight = bounds.right;
-  const enemyTop = bounds.top;
-  const enemyBottom = bounds.bottom;
-  return projectile.x < enemyRight && projectile.x + projectile.width > enemyLeft
-    && projectile.y < enemyBottom && projectile.y + projectileHeight > enemyTop;
+  if (enemy.retreating || enemy.exploded || enemy.expired) return false;
+  const projectileBounds = {
+    left: projectile.x,
+    top: projectile.y,
+    right: projectile.x + projectile.width,
+    bottom: projectile.y + projectile.height,
+  };
+  return getEnemyCollisionBoxes(enemy).some((bounds) => rectanglesOverlap(projectileBounds, bounds));
 }
 
 function playerHitTest(enemy, now) {
+  if (enemy.retreating || enemy.harmless || enemy.exploded || enemy.expired) return false;
   const { halfWidth, halfHeight } = getPlayerPixelBounds(now);
   const bounds = getEnemySpriteBounds(enemy);
-  if (enemy.behavior.name === 'knife') {
+  if (enemy.definition.name === 'knife') {
     if (enemy.passedPlayer) return false;
-    // A downward knife only threatens Junjun while its leading edge is above him.
     if (bounds.top > playerPosition.y) {
       enemy.passedPlayer = true;
       return false;
     }
   }
-  const enemyLeft = bounds.left;
-  const enemyRight = bounds.right;
-  const enemyTop = bounds.top;
-  const enemyBottom = bounds.bottom;
-  return playerPosition.x - halfWidth < enemyRight && playerPosition.x + halfWidth > enemyLeft
-    && playerPosition.y - halfHeight < enemyBottom && playerPosition.y + halfHeight > enemyTop;
+  const playerBounds = {
+    left: playerPosition.x - halfWidth,
+    top: playerPosition.y - halfHeight,
+    right: playerPosition.x + halfWidth,
+    bottom: playerPosition.y + halfHeight,
+  };
+  return getEnemyCollisionBoxes(enemy).some((box) => rectanglesOverlap(playerBounds, box));
 }
 
 function updateHearts() {
@@ -955,24 +1422,55 @@ function updateWaveHud() {
 function completeWave(now) {
   if (waveTransitionUntil > now || waveKills < WAVE_KILL_TARGET) return;
   waveTransitionUntil = now + 900;
+  nextEnemyAt = Infinity;
   waveLabel.textContent = 'WAVE COMPLETE';
   waveProgressNode.textContent = `${WAVE_KILL_TARGET}/${WAVE_KILL_TARGET}`;
   waveProgressNode.setAttribute('aria-label', 'Wave complete');
   playfield.classList.add('is-wave-complete');
+  enemies.forEach((enemy) => {
+    if (enemy.isDying) return;
+    const center = getEnemyVisualCenter(enemy);
+    enemy.retreating = true;
+    enemy.harmless = true;
+    enemy.exploded = false;
+    enemy.expired = false;
+    enemy.retreatVx = center.x < playfield.clientWidth / 2 ? -230 : 230;
+    enemy.retreatVy = -100;
+    enemy.node.classList.remove(
+      'is-telegraph', 'is-striking', 'is-recovering', 'is-sickle-windup', 'is-sickle-sweeping',
+      'is-bomb-warning', 'is-bomb-critical', 'is-bomb-exploding', 'is-hammer-locked', 'is-hammer-slamming', 'is-hammer-impact',
+    );
+    enemy.node.classList.add('is-wave-retreating');
+    if (enemy.warningNode) {
+      enemy.warningNode.remove();
+      enemy.warningNode = null;
+    }
+    if (enemy.explosionNode) {
+      enemy.explosionNode.remove();
+      enemy.explosionNode = null;
+    }
+  });
 }
 
 function confirmEnemyKill(now) {
   if (waveTransitionUntil > now || waveKills >= WAVE_KILL_TARGET) return;
   waveKills += 1;
   updateWaveHud();
+  if (wave === 1 && waveKills < WAVE_KILL_TARGET) {
+    nextEnemyAt = now + WAVE_ONE_SPAWN_DELAYS_MS[waveKills];
+    if (waveKills === 3) nextPowerupAt = now + 500;
+  }
   if (waveKills === WAVE_KILL_TARGET) completeWave(now);
 }
 
 function advanceWave(now) {
   if (!waveTransitionUntil || now < waveTransitionUntil) return;
+  enemies.forEach(removeEnemyVisual);
+  enemies = [];
   wave += 1;
   waveKills = 0;
   waveTransitionUntil = 0;
+  nextEnemyAt = now + 500;
   playfield.classList.remove('is-wave-complete');
   updateWaveHud();
 }
@@ -995,8 +1493,7 @@ function damagePlayer(now) {
 }
 
 function renderFatalEnemy(enemy) {
-  enemy.node.style.transform = `translate(${Math.round(enemy.x)}px, ${Math.round(enemy.y)}px)`;
-  updateEnemyTrail(enemy);
+  renderEnemy(enemy);
 }
 
 function setCameraOffset(x, y) {
@@ -1004,8 +1501,15 @@ function setCameraOffset(x, y) {
   gameWorld.style.setProperty('--camera-y', `${Math.round(y)}px`);
 }
 
+function setCameraZoom(scale = 1, originX = playfield.clientWidth / 2, originY = playfield.clientHeight / 2) {
+  gameWorld.style.setProperty('--camera-scale', String(Math.round(scale * 1000) / 1000));
+  gameWorld.style.setProperty('--camera-origin-x', `${Math.round(originX)}px`);
+  gameWorld.style.setProperty('--camera-origin-y', `${Math.round(originY)}px`);
+}
+
 function resetCamera() {
   setCameraOffset(0, ENTRY_PREINTRO_CAMERA_START_Y);
+  setCameraZoom(1);
 }
 
 function triggerFatalImpactShake() {
@@ -1025,11 +1529,21 @@ function triggerEntryLaunchShake() {
 function beginFatalSequence(enemy, now) {
   if (fatalSequenceActive || hearts !== 1 || shieldedUntil > now || invulnerableUntil > now) return false;
   const { halfHeight } = getPlayerPixelBounds(now);
-  const scale = enemy.size / 50;
-  const [spriteLeft, , spriteRight] = enemy.type.alphaBounds;
-  const spriteCenterX = ((spriteLeft + spriteRight) / 2) * scale;
-  const spriteBottom = enemy.type.alphaBounds[3] * scale;
+  setEnemyAngle(enemy, 0);
+  const spriteCenterX = enemy.visualBounds.centerX;
+  const spriteBottom = enemy.visualBounds.bottom;
   const preImpactY = playerPosition.y - halfHeight - spriteBottom - FATAL_PRE_IMPACT_GAP_PX;
+  enemy.exploded = false;
+  enemy.harmless = false;
+  enemy.retreating = false;
+  if (enemy.explosionNode) {
+    enemy.explosionNode.remove();
+    enemy.explosionNode = null;
+  }
+  enemy.node.classList.remove(
+    'is-bomb-warning', 'is-bomb-critical', 'is-bomb-exploding', 'is-hammer-locked', 'is-hammer-slamming', 'is-hammer-impact',
+    'is-sickle-windup', 'is-sickle-sweeping',
+  );
   fatalSequenceActive = true;
   fatalSequence = {
     enemy,
@@ -1046,7 +1560,7 @@ function beginFatalSequence(enemy, now) {
   };
   enemies.forEach((candidate) => {
     if (candidate === enemy) return;
-    const candidateCenterX = candidate.x + candidate.size / 2;
+    const candidateCenterX = getEnemyVisualCenter(candidate).x;
     const retreatDirection = candidateCenterX < playerPosition.x ? -1 : 1;
     fatalSequence.retreatingEnemies.push({
       enemy: candidate,
@@ -1061,6 +1575,10 @@ function beginFatalSequence(enemy, now) {
   projectiles = [];
   powerups = [];
   keys.clear();
+  if (enemy.warningNode) {
+    enemy.warningNode.remove();
+    enemy.warningNode = null;
+  }
   enemy.vx = 0;
   enemy.vy = 0;
   enemy.y = fatalSequence.anchorY;
@@ -1099,7 +1617,7 @@ function updateFatalSequence(now) {
     });
     if (elapsed >= FATAL_CAMERA_PAN_MS) {
       setCameraOffset(fatalSequence.cameraTargetX, fatalSequence.cameraTargetY);
-      fatalSequence.retreatingEnemies.forEach(({ enemy: retreatingEnemy }) => retreatingEnemy.node.remove());
+      fatalSequence.retreatingEnemies.forEach(({ enemy: retreatingEnemy }) => removeEnemyVisual(retreatingEnemy));
       fatalSequence.retreatingEnemies = [];
       enemies = [enemy];
       fatalSequence.phase = 'pause';
@@ -1179,7 +1697,7 @@ function updateFatalSequence(now) {
     renderFatalEnemy(enemy);
     if (elapsed >= FATAL_TOP_HOLD_MS) {
       const { halfHeight } = getPlayerPixelBounds(now);
-      const spriteBottom = enemy.type.alphaBounds[3] * (enemy.size / 50);
+      const spriteBottom = enemy.visualBounds.bottom;
       fatalSequence.phase = 'dash';
       fatalSequence.phaseStartedAt = now;
       fatalSequence.dashStartY = enemy.y;
@@ -1198,7 +1716,7 @@ function updateFatalSequence(now) {
     fatalSequenceActive = false;
     fatalSequence = null;
     triggerFatalImpactShake();
-    enemy.node.remove();
+    removeEnemyVisual(enemy);
     enemies = [];
     damagePlayer(now);
   }
@@ -1207,30 +1725,46 @@ function updateFatalSequence(now) {
 function updateEntities(delta, now) {
   const height = playfield.clientHeight;
   projectiles = projectiles.filter((projectile) => {
-    projectile.y -= delta * 480;
+    projectile.x += delta * projectile.vx;
+    projectile.y -= delta * projectile.vy;
     const frameIndex = Math.floor((now - projectile.spawnedAt) / PROJECTILE_FRAME_MS) % PROJECTILE_FRAMES.length;
     if (frameIndex !== projectile.frameIndex) {
       projectile.frameIndex = frameIndex;
       projectile.node.src = PROJECTILE_FRAMES[frameIndex];
     }
     projectile.node.style.transform = `translate(${projectile.x}px, ${projectile.y}px)`;
-    if (projectile.y < -40) { projectile.node.remove(); return false; }
+    if (projectile.y < -40 || projectile.x < -40 || projectile.x > playfield.clientWidth + 40) {
+      projectile.node.remove();
+      return false;
+    }
     return true;
   });
 
   enemies = enemies.filter((enemy) => {
     if (enemy.hitAt > 0) {
+      updateEnemyTrail(enemy, now);
       if (now - enemy.hitAt < 160) return true;
       enemy.node.classList.remove('is-hit');
       enemy.hitAt = 0;
       if (enemy.isDying) {
-        enemy.node.remove();
+        removeEnemyVisual(enemy);
         return false;
       }
     }
     updateEnemyMovement(enemy, delta, now);
-    enemy.node.style.transform = `translate(${enemy.x}px, ${enemy.y}px)`;
-    updateEnemyTrail(enemy);
+    renderEnemy(enemy, now);
+    if (enemy.expired) {
+      removeEnemyVisual(enemy);
+      return false;
+    }
+    if (enemy.retreating) {
+      const retreatBounds = getEnemySpriteBounds(enemy);
+      if (retreatBounds.right < -10 || retreatBounds.left > playfield.clientWidth + 10 || retreatBounds.bottom < -10) {
+        removeEnemyVisual(enemy);
+        return false;
+      }
+      return true;
+    }
     const hitIndex = projectiles.findIndex((projectile) => hitTest(projectile, enemy));
     if (hitIndex > -1) {
       projectiles[hitIndex].node.remove();
@@ -1247,14 +1781,24 @@ function updateEntities(delta, now) {
       return true;
     }
     if (playerHitTest(enemy, now)) {
-      if (hearts === 1 && shieldedUntil <= now && invulnerableUntil <= now) {
+      if (shieldedUntil > now) {
+        const center = getEnemyVisualCenter(enemy);
+        emitEnemyImpact(center.x, center.y, 'shield');
+        removeEnemyVisual(enemy);
+        return false;
+      }
+      if (invulnerableUntil > now) {
+        enemy.y += Math.max(8, Math.abs(enemy.vy) * delta);
+        return true;
+      }
+      if (hearts === 1) {
         enemy.strikeContactPending = false;
         beginFatalSequence(enemy, now);
         return true;
       }
       if (enemy.strikeContactPending || enemy.attackState === 'strike') {
         enemy.strikeContactPending = false;
-        enemy.node.remove();
+        removeEnemyVisual(enemy);
         damagePlayer(now);
         return false;
       }
@@ -1263,7 +1807,7 @@ function updateEntities(delta, now) {
           enemy.attackReadyAt = now;
           beginEnemyStrike(enemy, now);
         } else {
-          enemy.node.remove();
+          removeEnemyVisual(enemy);
           damagePlayer(now);
           return false;
         }
@@ -1271,8 +1815,9 @@ function updateEntities(delta, now) {
       return true;
     }
     enemy.strikeContactPending = false;
-    if (enemy.y > height + enemy.size || enemy.x < -enemy.size * 1.5 || enemy.x > playfield.clientWidth + enemy.size * .5) {
-      enemy.node.remove();
+    const bounds = getEnemySpriteBounds(enemy);
+    if (bounds.top > height + 30 || bounds.right < -enemy.size * .5 || bounds.left > playfield.clientWidth + enemy.size * .5) {
+      removeEnemyVisual(enemy);
       return false;
     }
     return true;
@@ -1288,7 +1833,8 @@ function updateEntities(delta, now) {
       powerup.node.remove();
       if (powerup.type === 'growth') activateGrowth(now);
       else if (powerup.type === 'shield') activateShield(now);
-      else activateAmmoPack(now);
+      else if (powerup.type === 'ammo') activateAmmoPack(now);
+      else activateSpreadShot(now);
       return false;
     }
     if (powerup.y > height + POWERUP_SIZE) { powerup.node.remove(); return false; }
@@ -1329,9 +1875,19 @@ function updateAmmoStatus(now) {
   ammoStatus.classList.toggle('is-expiring', ammoBoostUntil - now <= POWERUP_WARNING_MS);
 }
 
+function updateSpreadStatus(now) {
+  if (spreadShotUntil <= now) {
+    spreadStatus.classList.add('is-hidden');
+    spreadStatus.classList.remove('is-expiring');
+    return;
+  }
+  spreadStatus.classList.remove('is-hidden');
+  spreadStatus.classList.toggle('is-expiring', spreadShotUntil - now <= POWERUP_WARNING_MS);
+}
+
 function updatePowerupFlicker(now) {
   const activeExpirations = [shieldedUntil, grownUntil]
-    .concat(ammoBoostUntil)
+    .concat(ammoBoostUntil, spreadShotUntil)
     .filter((until) => until > now && until - now <= POWERUP_WARNING_MS);
   if (activeExpirations.length === 0) {
     player.classList.remove('is-powerup-expiring');
@@ -1399,6 +1955,38 @@ function getPreintroCameraTargetY(sceneY) {
   return Math.round(playfield.clientHeight * PREINTRO_TARUB_TARGET_TOP_RATIO - (sceneY + tarubTopOffset));
 }
 
+function getEntryCloudMotion(phase, elapsed, launchSpeed) {
+  if (phase === 'rocket') {
+    const intensity = Math.min(1, Math.max(0, launchSpeed / 1800));
+    return {
+      verticalScale: .25,
+      horizontalScale: .2,
+      launchParallax: 180 + intensity * 720,
+      recycle: false,
+    };
+  }
+  if (phase === 'overshoot-hold') {
+    const progress = Math.min(1, elapsed / ENTRY_OVERSHOOT_HOLD_MS);
+    return { verticalScale: .45, horizontalScale: .35, launchParallax: 190 * (1 - easeEntry(progress)), recycle: false };
+  }
+  if (phase === 'drift-down') return { verticalScale: .68, horizontalScale: .55, recycle: false };
+  if (['low-pause', 'correction-up', 'tiny-pause', 'correction-down', 'settle', 'settled'].includes(phase)) {
+    return { verticalScale: .82, horizontalScale: .78, recycle: false };
+  }
+  return { verticalScale: .3, horizontalScale: .28, recycle: false };
+}
+
+function retireEntrySceneWhenClear(phase) {
+  if (entryScene.hidden || ['preintro', 'wait'].includes(phase)) return;
+  const sceneRect = entryScene.getBoundingClientRect();
+  const playfieldRect = playfield.getBoundingClientRect();
+  if (sceneRect.top > playfieldRect.bottom + 24 || sceneRect.bottom < playfieldRect.top - 24) {
+    entryScene.hidden = true;
+    entryScene.removeAttribute('src');
+    entryScene.dataset.state = 'retired';
+  }
+}
+
 function setEntryPhase(phase, now) {
   entryCutscene.phase = phase;
   entryCutscene.phaseStartedAt = now;
@@ -1410,7 +1998,9 @@ function setEntryPhase(phase, now) {
     idleSerial += 1;
     shipSprite.src = `${IDLE_GIF}?entry-idle=${idleSerial}`;
     shipSprite.dataset.state = 'idle';
+    player.classList.add('is-entry-bracing');
   }
+  if (phase === 'rocket') player.classList.remove('is-entry-bracing');
   if (phase === 'overshoot-hold') triggerEntryLaunchShake();
 }
 
@@ -1432,10 +2022,13 @@ function beginEntryCutscene(now) {
     correctionLowY: finalY + 10,
     cameraX: 0,
     cameraY: 0,
+    previousY: sceneY + ENTRY_PREINTRO_JUNJUN_CENTER_OFFSET_Y,
   };
   keys.clear();
+  createClouds(sceneY);
   setPlayerPosition(finalX, entryCutscene.startY);
   setCameraOffset(0, ENTRY_PREINTRO_CAMERA_START_Y);
+  setCameraZoom(1, finalX, entryCutscene.startY);
   player.classList.add('is-entry-preintro');
   player.style.setProperty('--entry-preintro-size', `${ENTRY_PREINTRO_SIZE}px`);
   entryScene.style.setProperty('--entry-preintro-size', `${ENTRY_PREINTRO_SIZE}px`);
@@ -1451,99 +2044,103 @@ function updateEntryCutscene(now, delta) {
   const cutscene = entryCutscene;
   const phaseAtFrameStart = cutscene.phase;
   const elapsed = now - cutscene.phaseStartedAt;
-  const finalizationRemaining = phaseAtFrameStart === 'correction-up'
-    ? ENTRY_FINALIZATION_MS - elapsed
-    : Number.POSITIVE_INFINITY;
-  if (clouds.length === 0 && finalizationRemaining <= CLOUD_SETTLE_LEAD_MS) createClouds(now);
   let y = cutscene.finalY;
-  let environmentSpeed = .35;
   switch (cutscene.phase) {
     case 'preintro':
       y = cutscene.startY;
-      environmentSpeed = .35;
       if (elapsed >= ENTRY_PREINTRO_MS) setEntryPhase('wait', now);
       break;
-    case 'wait':
-      y = cutscene.startY;
-      environmentSpeed = .35;
+    case 'wait': {
+      const braceProgress = easeEntry(Math.min(1, elapsed / ENTRY_WAIT_MS));
+      y = cutscene.startY + ENTRY_BRACE_OFFSET_PX * braceProgress;
       if (elapsed >= ENTRY_WAIT_MS) setEntryPhase('rocket', now);
       break;
+    }
     case 'rocket': {
       const progress = Math.min(1, elapsed / ENTRY_ROCKET_MS);
-      const launch = 1 - ((1 - progress) ** 5);
-      y = cutscene.startY + (cutscene.overshootY - cutscene.startY) * launch;
-      environmentSpeed = 4.25;
+      const launch = 1 - ((1 - progress) ** 6);
+      const launchStartY = cutscene.startY + ENTRY_BRACE_OFFSET_PX;
+      y = launchStartY + (cutscene.overshootY - launchStartY) * launch;
       if (progress >= 1) setEntryPhase('overshoot-hold', now);
       break;
     }
     case 'overshoot-hold':
       y = cutscene.overshootY;
-      environmentSpeed = .55;
       if (elapsed >= ENTRY_OVERSHOOT_HOLD_MS) setEntryPhase('drift-down', now);
       break;
     case 'drift-down': {
       const progress = Math.min(1, elapsed / ENTRY_DRIFT_MS);
       y = cutscene.overshootY + (cutscene.tooFarDownY - cutscene.overshootY) * easeEntry(progress);
-      environmentSpeed = .8;
       if (progress >= 1) setEntryPhase('low-pause', now);
       break;
     }
     case 'low-pause':
       y = cutscene.tooFarDownY;
-      environmentSpeed = .45;
       if (elapsed >= ENTRY_LOW_PAUSE_MS) setEntryPhase('correction-up', now);
       break;
     case 'correction-up': {
       const progress = Math.min(1, elapsed / ENTRY_CORRECTION_UP_MS);
       y = cutscene.tooFarDownY + (cutscene.correctionHighY - cutscene.tooFarDownY) * easeEntry(progress);
-      environmentSpeed = .65;
       if (progress >= 1) setEntryPhase('tiny-pause', now);
       break;
     }
     case 'tiny-pause':
       y = cutscene.correctionHighY;
-      environmentSpeed = .4;
       if (elapsed >= ENTRY_TINY_PAUSE_MS) setEntryPhase('correction-down', now);
       break;
     case 'correction-down': {
       const progress = Math.min(1, elapsed / ENTRY_CORRECTION_DOWN_MS);
       y = cutscene.correctionHighY + (cutscene.correctionLowY - cutscene.correctionHighY) * easeEntry(progress);
-      environmentSpeed = .55;
       if (progress >= 1) setEntryPhase('settle', now);
       break;
     }
     case 'settle': {
       const progress = Math.min(1, elapsed / ENTRY_SETTLE_MS);
       y = cutscene.correctionLowY + (cutscene.finalY - cutscene.correctionLowY) * easeEntry(progress);
-      environmentSpeed = .45;
       if (progress >= 1) setEntryPhase('settled', now);
       break;
     }
     case 'settled':
       y = cutscene.finalY;
-      environmentSpeed = .35;
       if (elapsed >= ENTRY_SETTLE_HOLD_MS) {
-        entryCutsceneActive = false;
-        entryCutscene = null;
         keys.clear();
         setPlayerPosition(cutscene.finalX, cutscene.finalY);
         setCameraOffset(0, 0);
+        setCameraZoom(1);
         entryScene.hidden = true;
         entryScene.removeAttribute('src');
         entryScene.dataset.state = 'hidden';
-        if (clouds.length === 0) createClouds(now);
-        playfield.classList.add('is-gameplay-ui-visible');
-        playfieldWrap.classList.add('is-gameplay-ui-visible');
-        spawnEnemy();
+        player.classList.add('is-entry-relieved');
+        setEntryPhase('freedom', now);
         return;
       }
       break;
+    case 'freedom':
+      y = cutscene.finalY;
+      setCameraOffset(0, 0);
+      setCameraZoom(1);
+      updateClouds(delta);
+      if (elapsed >= ENTRY_FREEDOM_CONTROL_DELAY_MS) movePlayer(delta);
+      if (elapsed >= ENTRY_FREEDOM_HUD_DELAY_MS) {
+        playfield.classList.add('is-gameplay-ui-visible');
+        playfieldWrap.classList.add('is-gameplay-ui-visible');
+      }
+      if (elapsed >= ENTRY_FREEDOM_MS) {
+        player.classList.remove('is-entry-relieved');
+        entryCutsceneActive = false;
+        entryCutscene = null;
+        nextEnemyAt = now;
+        spawnEnemy();
+      }
+      return;
     default:
       entryCutsceneActive = false;
       entryCutscene = null;
       return;
   }
   setPlayerPosition(cutscene.finalX, Math.round(y));
+  const launchSpeed = delta > 0 ? Math.max(0, (cutscene.previousY - y) / delta) : 0;
+  cutscene.previousY = y;
   const gameplayCameraY = cutscene.finalY - y;
   const centerCameraY = playfield.clientHeight / 2 - y;
   const sceneCenterCameraY = playfield.clientHeight / 2 - cutscene.sceneY;
@@ -1563,41 +2160,61 @@ function updateEntryCutscene(now, delta) {
     } else {
       cutscene.cameraY = preintroCameraTargetY * slowRevealProgress;
     }
+    const pushProgress = easeEntry(Math.min(1, Math.max(0, (elapsed - (ENTRY_PREINTRO_MS - ENTRY_PRELAUNCH_PUSH_MS)) / ENTRY_PRELAUNCH_PUSH_MS)));
+    const pushScale = 1 + (ENTRY_PRELAUNCH_ZOOM - 1) * pushProgress;
     setCameraOffset(cutscene.cameraX, cutscene.cameraY);
-    updateClouds(delta * environmentSpeed, now);
+    setCameraZoom(pushScale, cutscene.finalX, cutscene.startY);
+    updateClouds(delta, getEntryCloudMotion(phaseAtFrameStart, elapsed, launchSpeed));
     return;
   } else if (phaseAtFrameStart === 'wait') {
     // Hold the reveal framing during the handoff instead of snapping back
     // before the existing launch begins.
     cameraTargetY = preintroCameraTargetY;
     cameraEase = 2.4;
+    setCameraZoom(ENTRY_PRELAUNCH_ZOOM, cutscene.finalX, cutscene.startY);
   } else if (phaseAtFrameStart === 'rocket') {
-    // Follow the rocket toward the viewport center while deliberately lagging behind it.
     const launchProgress = Math.min(1, elapsed / ENTRY_ROCKET_MS);
-    const launchCameraBias = Math.min(0, preintroCameraTargetY - sceneCenterCameraY) * (1 - launchProgress);
-    cameraTargetY = gameplayCameraY + (centerCameraY - gameplayCameraY) * .72 + launchCameraBias;
-    cameraEase = 4.5;
+    const zoomRecovery = 1 - ((1 - launchProgress) ** 3);
+    setCameraZoom(ENTRY_PRELAUNCH_ZOOM + (1 - ENTRY_PRELAUNCH_ZOOM) * zoomRecovery, cutscene.finalX, cutscene.startY);
+    if (elapsed < ENTRY_CAMERA_REACTION_DELAY_MS) {
+      cameraTargetY = preintroCameraTargetY;
+      cameraEase = 1.7;
+    } else {
+      const recoveryProgress = Math.min(1, (elapsed - ENTRY_CAMERA_REACTION_DELAY_MS) / (ENTRY_ROCKET_MS - ENTRY_CAMERA_REACTION_DELAY_MS));
+      const recoveryEase = 1 - ((1 - recoveryProgress) ** 3);
+      const recoveryTarget = gameplayCameraY + (centerCameraY - gameplayCameraY) * .78;
+      cameraTargetY = preintroCameraTargetY + (recoveryTarget - preintroCameraTargetY) * recoveryEase;
+      cameraEase = 8;
+    }
   } else if (cutscene.phase === 'overshoot-hold') {
+    setCameraZoom(1, cutscene.finalX, cutscene.startY);
     const holdProgress = Math.min(1, elapsed / ENTRY_OVERSHOOT_HOLD_MS);
     const cameraOverrun = (1 - easeEntry(holdProgress)) * 22;
     cameraTargetY = centerCameraY + cameraOverrun;
     cameraEase = 7;
   } else if (cutscene.phase === 'drift-down') {
+    setCameraZoom(1, cutscene.finalX, cutscene.startY);
     const driftProgress = Math.min(1, elapsed / ENTRY_DRIFT_MS);
     const centerBlend = .72 * (1 - easeEntry(driftProgress));
     cameraTargetY = gameplayCameraY + (centerCameraY - gameplayCameraY) * centerBlend;
     cameraEase = 3;
   } else if (cutscene.phase === 'low-pause' || cutscene.phase === 'correction-up' || cutscene.phase === 'tiny-pause' || cutscene.phase === 'correction-down') {
     // The joke has landed; keep the corrections readable while the camera quietly returns home.
-    cameraTargetY = gameplayCameraY * .2;
-    cameraEase = 2.8;
+    cameraTargetY = gameplayCameraY * .12;
+    cameraEase = 2.5;
+    setCameraZoom(1, cutscene.finalX, cutscene.startY);
   } else if (cutscene.phase === 'settle' || cutscene.phase === 'settled') {
-    cameraTargetY = gameplayCameraY;
-    cameraEase = 4;
+    const residual = cutscene.phase === 'settle'
+      ? 4 * (1 - easeEntry(Math.min(1, elapsed / ENTRY_SETTLE_MS)))
+      : 0;
+    cameraTargetY = gameplayCameraY + residual;
+    cameraEase = 4.5;
+    setCameraZoom(1, cutscene.finalX, cutscene.startY);
   }
   cutscene.cameraY += (cameraTargetY - cutscene.cameraY) * Math.min(1, delta * cameraEase);
   setCameraOffset(cutscene.cameraX, cutscene.cameraY);
-  updateClouds(delta * environmentSpeed, now);
+  retireEntrySceneWhenClear(phaseAtFrameStart);
+  updateClouds(delta, getEntryCloudMotion(phaseAtFrameStart, elapsed, launchSpeed));
 }
 
 function loop(now) {
@@ -1615,7 +2232,7 @@ function loop(now) {
     return;
   }
   movePlayer(delta);
-  updateClouds(delta, now);
+  updateClouds(delta);
   replenishAmmo(now);
   updateAmmo();
   if ((keys.has(' ') || keys.has('Spacebar')) && now >= nextAutoShotAt) {
@@ -1628,11 +2245,16 @@ function loop(now) {
   updateShieldStatus(now);
   updateGrowthStatus(now);
   updateAmmoStatus(now);
+  updateSpreadStatus(now);
   updatePowerupFlicker(now);
   advanceWave(now);
-  const maxEnemies = Math.min(7, 2 + Math.floor(wave / 2));
-  if (!waveTransitionUntil && enemies.length < maxEnemies && Math.random() < delta * getWaveTuning().spawnRate) spawnEnemy();
-  if (now >= nextPowerupAt) {
+  const activeEnemyCount = enemies.filter((enemy) => !enemy.retreating && !enemy.isDying && !enemy.exploded).length;
+  const maxEnemies = wave === 1 ? 1 : Math.min(7, 2 + Math.floor(wave / 2));
+  if (!waveTransitionUntil && now >= nextEnemyAt && activeEnemyCount < maxEnemies) {
+    const spawned = spawnEnemy();
+    if (wave !== 1) nextEnemyAt = now + (spawned ? getEnemySpawnInterval() : 140);
+  }
+  if (now >= nextPowerupAt && (wave !== 1 || !waveOnePowerupSpawned)) {
     spawnPowerup();
     nextPowerupAt = now + randomBetween(7000, 10500);
   }
@@ -1654,6 +2276,9 @@ function startGame() {
   playfield.classList.remove('is-gameplay-ui-visible');
   playfieldWrap.classList.remove('is-gameplay-ui-visible');
   enemySpawnSerial = 0;
+  lastEnemyType = '';
+  nextEnemyAt = Infinity;
+  waveOnePowerupSpawned = false;
   nextAutoShotAt = 0;
   ammoRechargeAt = 0;
   reloadUntil = 0;
@@ -1664,13 +2289,14 @@ function startGame() {
   shieldedUntil = 0;
   grownUntil = 0;
   ammoBoostUntil = 0;
+  spreadShotUntil = 0;
   shieldSerial = 0;
-  nextPowerupAt = performance.now() + 2500;
+  nextPowerupAt = Infinity;
   scoreNode.textContent = padScore(score);
   updateWaveHud();
   updateHearts();
   updateAmmo();
-  enemies.forEach((enemy) => enemy.node.remove());
+  enemies.forEach(removeEnemyVisual);
   projectiles.forEach((projectile) => projectile.node.remove());
   powerups.forEach((powerup) => powerup.node.remove());
   enemies = [];
@@ -1683,9 +2309,11 @@ function startGame() {
   shieldStatus.classList.add('is-hidden');
   growthStatus.classList.add('is-hidden');
   ammoStatus.classList.add('is-hidden');
+  spreadStatus.classList.add('is-hidden');
   shieldStatus.classList.remove('is-expiring');
   growthStatus.classList.remove('is-expiring');
   ammoStatus.classList.remove('is-expiring');
+  spreadStatus.classList.remove('is-expiring');
   invulnerableUntil = 0;
   player.classList.remove('is-powerup-expiring');
   player.style.removeProperty('--flicker-speed');
@@ -1709,14 +2337,17 @@ function endGame() {
   shieldedUntil = 0;
   grownUntil = 0;
   ammoBoostUntil = 0;
+  spreadShotUntil = 0;
   clearPowerupParticles();
-  enemies.forEach((enemy) => enemy.node.remove());
+  enemies.forEach(removeEnemyVisual);
   enemies = [];
   player.classList.remove('is-shielded');
   player.classList.remove('is-grown');
   player.classList.remove('is-hurt', 'is-powerup-expiring');
   ammoStatus.classList.add('is-hidden');
   ammoStatus.classList.remove('is-expiring');
+  spreadStatus.classList.add('is-hidden');
+  spreadStatus.classList.remove('is-expiring');
   keys.clear();
   deathSerial += 1;
   shipSprite.src = `${DEATH_FRAMES[0]}?death=${deathSerial}`;
