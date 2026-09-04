@@ -113,6 +113,7 @@ button { font: inherit; }
 .entry-scene { position: absolute; z-index: 2; display: block; width: var(--entry-preintro-size, 120px); height: var(--entry-preintro-size, 120px); transform: translate(-50%, -50%); object-fit: contain; image-rendering: pixelated; pointer-events: none; }
 .entry-scene[hidden] { display: none; }
 .player.is-entry-preintro .ship-sprite { visibility: hidden; }
+.player.is-entry-transitioning .ship-sprite { visibility: hidden; }
 .player.is-entry-relieved .ship-slot { animation: entry-relieved .72s steps(4, end) 2; }
 .player.is-entry-bracing .ship-slot { transform-origin: center bottom; animation: entry-brace .12s steps(2, end) infinite; }
 .player.is-death-flash .ship-sprite { filter: brightness(0) saturate(100%) invert(19%) sepia(98%) saturate(4318%) hue-rotate(348deg) brightness(106%) contrast(117%); }

@@ -1992,6 +1992,7 @@ function setEntryPhase(phase, now) {
   entryCutscene.phaseStartedAt = now;
   if (phase === 'wait') {
     player.classList.remove('is-entry-preintro');
+    player.classList.add('is-entry-transitioning');
     player.style.removeProperty('--entry-preintro-size');
     entryScene.src = `${ENTRY_TRANSITION_FRAME}?entry-transition=${Math.round(now)}`;
     entryScene.dataset.state = 'transition';
@@ -2110,6 +2111,7 @@ function updateEntryCutscene(now, delta) {
         entryScene.hidden = true;
         entryScene.removeAttribute('src');
         entryScene.dataset.state = 'hidden';
+        player.classList.remove('is-entry-transitioning');
         player.classList.add('is-entry-relieved');
         setEntryPhase('freedom', now);
         return;
@@ -2267,6 +2269,7 @@ function startGame() {
   fatalSequence = null;
   entryCutsceneActive = false;
   entryCutscene = null;
+  player.classList.remove('is-entry-transitioning');
   score = 0;
   hearts = MAX_HEARTS;
   ammo = MAX_AMMO;
