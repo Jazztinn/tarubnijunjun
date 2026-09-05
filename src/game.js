@@ -2052,6 +2052,10 @@ function replenishAmmo(now) {
     mobileReloadRequired = false;
     return;
   }
+  if (MOBILE_MODE && mobileReloadRequired) {
+    updateAmmo(now);
+    return;
+  }
   if (ammoRechargeAt === 0) ammoRechargeAt = now + Math.round(AMMO_RECHARGE_DELAY_MS / getAmmoRechargeMultiplier(now));
   if (now >= reloadUntil && now >= ammoRechargeAt) {
     ammo += 1;
