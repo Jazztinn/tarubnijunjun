@@ -132,7 +132,8 @@ const AMMO_REARM_THRESHOLD = Math.ceil(MAX_AMMO / 2);
 const EMPTY_AMMO_BYPASS_LIMIT = 3;
 const MOBILE_MODE = window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(max-width: 650px)').matches;
 const MOBILE_SHAKE_COOLDOWN_MS = 900;
-const MOBILE_SHAKE_DELTA_THRESHOLD = 10;
+const MOBILE_VERTICAL_SHAKE_THRESHOLD = 8;
+const MOBILE_SHAKE_WINDOW_MS = 900;
 const SHOOT_ANIMATION_MS = 500;
 const PROJECTILE_DELAY_MS = 70;
 const PROJECTILE_FRAME_MS = 70;
@@ -230,8 +231,11 @@ let emptyAmmoLockArmed = true;
 let emptyAmmoBypassCount = 0;
 let mobileReloadRequired = false;
 let motionControlsRequested = false;
-let lastMotionMagnitude = 0;
 let lastShakeAt = 0;
+let lastMotionY = 0;
+let lastVerticalDirection = 0;
+let verticalReversals = 0;
+let lastVerticalChangeAt = 0;
 let mobileMoveX = 0;
 let mobileMoveY = 0;
 let mobileJoystickPointerId = null;
@@ -469,12 +473,22 @@ function handleDeviceMotion(event) {
   if (!MOBILE_MODE) return;
   const acceleration = event.accelerationIncludingGravity || event.acceleration;
   if (!acceleration) return;
-  const magnitude = Math.hypot(acceleration.x || 0, acceleration.y || 0, acceleration.z || 0);
-  const change = Math.abs(magnitude - lastMotionMagnitude);
-  lastMotionMagnitude = magnitude;
+  const motionY = acceleration.y || 0;
+  const verticalChange = motionY - lastMotionY;
+  lastMotionY = motionY;
   const now = performance.now();
-  if (change >= MOBILE_SHAKE_DELTA_THRESHOLD && now - lastShakeAt >= MOBILE_SHAKE_COOLDOWN_MS) {
+  if (Math.abs(verticalChange) < MOBILE_VERTICAL_SHAKE_THRESHOLD) return;
+  if (now - lastVerticalChangeAt > MOBILE_SHAKE_WINDOW_MS) {
+    lastVerticalDirection = 0;
+    verticalReversals = 0;
+  }
+  const verticalDirection = Math.sign(verticalChange);
+  if (lastVerticalDirection && verticalDirection !== lastVerticalDirection) verticalReversals += 1;
+  lastVerticalDirection = verticalDirection;
+  lastVerticalChangeAt = now;
+  if (verticalReversals >= 1 && now - lastShakeAt >= MOBILE_SHAKE_COOLDOWN_MS) {
     lastShakeAt = now;
+    verticalReversals = 0;
     triggerMobileReload(now);
   }
 }
@@ -2411,7 +2425,10 @@ function startGame() {
   entryCutscene = null;
   player.classList.remove('is-entry-transitioning');
   mobileReloadRequired = false;
-  lastMotionMagnitude = 0;
+  lastMotionY = 0;
+  lastVerticalDirection = 0;
+  verticalReversals = 0;
+  lastVerticalChangeAt = 0;
   lastShakeAt = 0;
   enableMotionControls();
   score = 0;
