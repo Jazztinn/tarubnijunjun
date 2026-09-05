@@ -23,6 +23,7 @@ const growthStatus = document.querySelector('#growth-status');
 const ammoStatus = document.querySelector('#ammo-status');
 const spreadStatus = document.querySelector('#spread-status');
 const ammoHud = document.querySelector('#ammo-hud');
+const ammoLabel = ammoHud.querySelector('.ammo-label');
 const ammoPips = [...document.querySelectorAll('.ammo-pip')];
 const heartHud = document.querySelector('#heart-hud');
 const heartNodes = [...heartHud.querySelectorAll('.heart')];
@@ -126,6 +127,9 @@ const AMMO_RECHARGE_INTERVAL_MS = 900;
 const EMPTY_AMMO_RECHARGE_DELAY_MS = 5000;
 const AMMO_REARM_THRESHOLD = Math.ceil(MAX_AMMO / 2);
 const EMPTY_AMMO_BYPASS_LIMIT = 3;
+const MOBILE_MODE = window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(max-width: 650px)').matches;
+const MOBILE_SHAKE_COOLDOWN_MS = 900;
+const MOBILE_SHAKE_DELTA_THRESHOLD = 10;
 const SHOOT_ANIMATION_MS = 500;
 const PROJECTILE_DELAY_MS = 70;
 const PROJECTILE_FRAME_MS = 70;
@@ -221,6 +225,10 @@ let ammoRechargeAt = 0;
 let reloadUntil = 0;
 let emptyAmmoLockArmed = true;
 let emptyAmmoBypassCount = 0;
+let mobileReloadRequired = false;
+let motionControlsRequested = false;
+let lastMotionMagnitude = 0;
+let lastShakeAt = 0;
 let shootingUntil = 0;
 let shotSerial = 0;
 let idleSerial = 0;
@@ -441,6 +449,42 @@ function getAmmoRechargeMultiplier(now) {
   return ammoBoostUntil > now ? 3 : 1;
 }
 
+function triggerMobileReload(now = performance.now()) {
+  if (!MOBILE_MODE || !mobileReloadRequired || !running || entryCutsceneActive || deathSequenceActive || fatalSequenceActive) return false;
+  mobileReloadRequired = false;
+  reloadUntil = now + EMPTY_AMMO_RECHARGE_DELAY_MS;
+  ammoRechargeAt = reloadUntil;
+  updateAmmo(now);
+  return true;
+}
+
+function handleDeviceMotion(event) {
+  if (!MOBILE_MODE) return;
+  const acceleration = event.accelerationIncludingGravity || event.acceleration;
+  if (!acceleration) return;
+  const magnitude = Math.hypot(acceleration.x || 0, acceleration.y || 0, acceleration.z || 0);
+  const change = Math.abs(magnitude - lastMotionMagnitude);
+  lastMotionMagnitude = magnitude;
+  const now = performance.now();
+  if (change >= MOBILE_SHAKE_DELTA_THRESHOLD && now - lastShakeAt >= MOBILE_SHAKE_COOLDOWN_MS) {
+    lastShakeAt = now;
+    triggerMobileReload(now);
+  }
+}
+
+function enableMotionControls() {
+  if (!MOBILE_MODE || motionControlsRequested || !('DeviceMotionEvent' in window)) return;
+  motionControlsRequested = true;
+  const requestPermission = DeviceMotionEvent.requestPermission;
+  if (typeof requestPermission === 'function') {
+    requestPermission.call(DeviceMotionEvent).then((permission) => {
+      if (permission === 'granted') window.addEventListener('devicemotion', handleDeviceMotion, { passive: true });
+    }).catch(() => {});
+    return;
+  }
+  window.addEventListener('devicemotion', handleDeviceMotion, { passive: true });
+}
+
 function triggerPowerupTransition(type, now) {
   const replacingActivePowerup = shieldedUntil > now || grownUntil > now || ammoBoostUntil > now || spreadShotUntil > now;
   powerupTransitionSerial += 1;
@@ -532,6 +576,7 @@ function fire(now) {
       // Lock on the first empty magazine, then force another lock after three bypasses.
       reloadUntil = now + EMPTY_AMMO_RECHARGE_DELAY_MS;
       ammoRechargeAt = reloadUntil;
+      mobileReloadRequired = MOBILE_MODE;
       emptyAmmoLockArmed = false;
       emptyAmmoBypassCount = 0;
     } else {
@@ -1905,8 +1950,10 @@ function updatePowerupFlicker(now) {
 
 function updateAmmo(now = performance.now()) {
   const recharging = ammo < MAX_AMMO && ammoRechargeAt > now;
+  ammoLabel.textContent = mobileReloadRequired ? 'SHAKE' : 'AMMO';
   ammoHud.setAttribute('aria-label', `Ammunition: ${ammo} of ${MAX_AMMO}${recharging ? ', recharging' : ''}`);
   ammoHud.classList.toggle('is-reloading', now < reloadUntil);
+  ammoHud.classList.toggle('is-shake-required', mobileReloadRequired);
   ammoPips.forEach((pip, index) => pip.classList.toggle('is-spent', index >= ammo));
 }
 
@@ -1916,6 +1963,7 @@ function replenishAmmo(now) {
     reloadUntil = 0;
     emptyAmmoLockArmed = true;
     emptyAmmoBypassCount = 0;
+    mobileReloadRequired = false;
     return;
   }
   if (ammoRechargeAt === 0) ammoRechargeAt = now + Math.round(AMMO_RECHARGE_DELAY_MS / getAmmoRechargeMultiplier(now));
@@ -2285,6 +2333,10 @@ function startGame() {
   entryCutsceneActive = false;
   entryCutscene = null;
   player.classList.remove('is-entry-transitioning');
+  mobileReloadRequired = false;
+  lastMotionMagnitude = 0;
+  lastShakeAt = 0;
+  enableMotionControls();
   score = 0;
   hearts = MAX_HEARTS;
   ammo = MAX_AMMO;

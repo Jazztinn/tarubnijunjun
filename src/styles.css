@@ -126,6 +126,7 @@ button { font: inherit; }
 .entity-layer { z-index: 3; pointer-events: none; }
 .projectile { position: absolute; display: block; object-fit: contain; image-rendering: pixelated; }
 .ammo-hud.is-reloading .ammo-pips { animation: ammo-reload .24s steps(2, end) infinite; }
+.ammo-hud.is-shake-required .ammo-pips { animation: ammo-shake-prompt .42s steps(2, end) infinite; }
 .enemy { position: absolute; z-index: 2; width: var(--enemy-size, 100px); height: var(--enemy-size, 100px); image-rendering: pixelated; }
 .enemy-motion-trail { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .enemy-motion-trail line { stroke: #ffffff; stroke-linecap: round; stroke-linejoin: round; }
@@ -213,6 +214,7 @@ button { font: inherit; }
 .spread-status .powerup-status-icon { position: absolute; top: 50%; left: 50%; width: 120px; height: 120px; max-width: none; transform: translate(-50%, -50%); object-fit: contain; }
 @keyframes status-flicker { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 @keyframes ammo-reload { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(2px); } }
+@keyframes ammo-shake-prompt { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
 
 @media (max-width: 650px) {
   .game-shell { width: min(100% - 20px, 430px); padding-top: 16px; }
