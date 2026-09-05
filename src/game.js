@@ -24,6 +24,9 @@ const ammoStatus = document.querySelector('#ammo-status');
 const spreadStatus = document.querySelector('#spread-status');
 const ammoHud = document.querySelector('#ammo-hud');
 const ammoLabel = ammoHud.querySelector('.ammo-label');
+const mobileJoystick = document.querySelector('#mobile-joystick');
+const mobileJoystickKnob = document.querySelector('#mobile-joystick-knob');
+const mobileShoot = document.querySelector('#mobile-shoot');
 const ammoPips = [...document.querySelectorAll('.ammo-pip')];
 const heartHud = document.querySelector('#heart-hud');
 const heartNodes = [...heartHud.querySelectorAll('.heart')];
@@ -229,6 +232,10 @@ let mobileReloadRequired = false;
 let motionControlsRequested = false;
 let lastMotionMagnitude = 0;
 let lastShakeAt = 0;
+let mobileMoveX = 0;
+let mobileMoveY = 0;
+let mobileJoystickPointerId = null;
+let mobileShootActive = false;
 let shootingUntil = 0;
 let shotSerial = 0;
 let idleSerial = 0;
@@ -484,6 +491,71 @@ function enableMotionControls() {
   }
   window.addEventListener('devicemotion', handleDeviceMotion, { passive: true });
 }
+
+function updateMobileJoystick(event) {
+  const bounds = mobileJoystick.getBoundingClientRect();
+  const radius = bounds.width * .34;
+  const centerX = bounds.left + bounds.width / 2;
+  const centerY = bounds.top + bounds.height / 2;
+  const distanceX = event.clientX - centerX;
+  const distanceY = event.clientY - centerY;
+  const distance = Math.hypot(distanceX, distanceY) || 1;
+  const scale = Math.min(1, radius / distance);
+  mobileMoveX = distanceX * scale / radius;
+  mobileMoveY = distanceY * scale / radius;
+  mobileJoystickKnob.style.transform = `translate(${Math.round(distanceX * scale)}px, ${Math.round(distanceY * scale)}px)`;
+}
+
+function resetMobileJoystick() {
+  mobileMoveX = 0;
+  mobileMoveY = 0;
+  mobileJoystickPointerId = null;
+  mobileJoystickKnob.style.transform = 'translate(0, 0)';
+}
+
+function resetMobileControls() {
+  resetMobileJoystick();
+  mobileShootActive = false;
+  mobileShoot.classList.remove('is-pressed');
+}
+
+mobileJoystick.addEventListener('pointerdown', (event) => {
+  if (!MOBILE_MODE) return;
+  event.preventDefault();
+  mobileJoystickPointerId = event.pointerId;
+  mobileJoystick.setPointerCapture(event.pointerId);
+  updateMobileJoystick(event);
+});
+mobileJoystick.addEventListener('pointermove', (event) => {
+  if (event.pointerId === mobileJoystickPointerId) updateMobileJoystick(event);
+});
+mobileJoystick.addEventListener('pointerup', (event) => {
+  if (event.pointerId === mobileJoystickPointerId) resetMobileJoystick();
+});
+mobileJoystick.addEventListener('pointercancel', resetMobileJoystick);
+
+mobileShoot.addEventListener('pointerdown', (event) => {
+  if (!MOBILE_MODE) return;
+  event.preventDefault();
+  mobileShootActive = true;
+  mobileShoot.classList.add('is-pressed');
+  if (running && !entryCutsceneActive) {
+    const now = performance.now();
+    if (now >= nextAutoShotAt) {
+      fire(now);
+      nextAutoShotAt = now + FIRE_RATE_MS;
+    }
+  }
+});
+mobileShoot.addEventListener('pointerup', () => {
+  mobileShootActive = false;
+  mobileShoot.classList.remove('is-pressed');
+});
+mobileShoot.addEventListener('pointercancel', () => {
+  mobileShootActive = false;
+  mobileShoot.classList.remove('is-pressed');
+});
+window.addEventListener('blur', resetMobileControls);
 
 function triggerPowerupTransition(type, now) {
   const replacingActivePowerup = shieldedUntil > now || grownUntil > now || ammoBoostUntil > now || spreadShotUntil > now;
@@ -1982,12 +2054,17 @@ function replenishAmmo(now) {
 
 function movePlayer(delta) {
   const speed = 250;
-  let dx = 0;
-  let dy = 0;
+  let dx = mobileMoveX;
+  let dy = mobileMoveY;
   if (keys.has('ArrowLeft') || keys.has('a')) dx -= 1;
   if (keys.has('ArrowRight') || keys.has('d')) dx += 1;
   if (keys.has('ArrowUp') || keys.has('w')) dy -= 1;
   if (keys.has('ArrowDown') || keys.has('s')) dy += 1;
+  const inputMagnitude = Math.hypot(dx, dy);
+  if (inputMagnitude > 1) {
+    dx /= inputMagnitude;
+    dy /= inputMagnitude;
+  }
   const { halfWidth, halfHeight } = getPlayerPixelBounds();
   setPlayerPosition(
     Math.max(halfWidth, Math.min(playfield.clientWidth - halfWidth, playerPosition.x + dx * speed * delta)),
@@ -2300,7 +2377,7 @@ function loop(now) {
   updateClouds(delta);
   replenishAmmo(now);
   updateAmmo();
-  if ((keys.has(' ') || keys.has('Spacebar')) && now >= nextAutoShotAt) {
+  if ((keys.has(' ') || keys.has('Spacebar') || mobileShootActive) && now >= nextAutoShotAt) {
     fire(now);
     nextAutoShotAt = now + FIRE_RATE_MS;
   }
@@ -2354,6 +2431,7 @@ function startGame() {
   reloadUntil = 0;
   emptyAmmoLockArmed = true;
   emptyAmmoBypassCount = 0;
+  resetMobileControls();
   shootingUntil = 0;
   nextShotAllowedAt = 0;
   shieldedUntil = 0;
@@ -2419,6 +2497,7 @@ function endGame() {
   spreadStatus.classList.add('is-hidden');
   spreadStatus.classList.remove('is-expiring');
   keys.clear();
+  resetMobileControls();
   deathSerial += 1;
   shipSprite.src = `${DEATH_FRAMES[0]}?death=${deathSerial}`;
   shipSprite.dataset.state = 'death';

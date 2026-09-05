@@ -196,6 +196,16 @@ button { font: inherit; }
 .overlay-card button { min-height: 48px; padding: 0 16px; border: 3px solid #ffffff; color: #000000; background: #ffffff; cursor: pointer; }
 .overlay-card button:hover, .overlay-card button:focus-visible { color: #ffffff; background: #000000; border-color: #ffffff; outline: none; }
 .overlay-card small { display: block; margin-top: 25px; color: #a6a6a6; font-size: 7px; line-height: 2; }
+#mobile-controls { display: none; }
+.mobile-joystick, .mobile-shoot { touch-action: none; user-select: none; -webkit-user-select: none; }
+@media (max-width: 650px), (pointer: coarse) {
+  #mobile-controls { position: absolute; z-index: 10; inset: 0; display: none; pointer-events: none; }
+  .playfield.is-gameplay-ui-visible #mobile-controls { display: block; }
+  .mobile-joystick { position: absolute; bottom: 18px; left: 16px; width: 92px; height: 92px; padding: 0; border: 3px solid rgba(255, 255, 255, .72); border-radius: 50%; background: rgba(0, 0, 0, .28); pointer-events: auto; }
+  .mobile-joystick-knob { position: absolute; top: 50%; left: 50%; display: block; width: 36px; height: 36px; margin: -18px 0 0 -18px; border: 3px solid #ffffff; border-radius: 50%; background: rgba(255, 255, 255, .24); transform: translate(0, 0); }
+  .mobile-shoot { position: absolute; right: 16px; bottom: 24px; width: 76px; height: 76px; padding: 0; border: 3px solid #ffffff; border-radius: 50%; color: #ffffff; background: rgba(0, 0, 0, .5); font-size: 10px; letter-spacing: 1px; pointer-events: auto; }
+  .mobile-shoot.is-pressed { color: #000000; background: #ffffff; }
+}
 
 .controls { display: grid; gap: 8px; padding: 14px 0 0; color: #a6a6a6; font-size: 8px; }
 .control-item { display: flex; align-items: center; gap: 8px; }
