@@ -1990,6 +1990,7 @@ function retireEntrySceneWhenClear(phase) {
     entryChair.hidden = true;
     entryChair.removeAttribute('src');
     entryChair.dataset.state = 'retired';
+    player.classList.remove('is-entry-transitioning');
   }
 }
 
