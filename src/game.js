@@ -1999,7 +1999,6 @@ function setEntryPhase(phase, now) {
   entryCutscene.phaseStartedAt = now;
   if (phase === 'wait') {
     player.classList.remove('is-entry-preintro');
-    player.classList.add('is-entry-transitioning');
     player.style.removeProperty('--entry-preintro-size');
     entryScene.src = `${ENTRY_TRANSITION_FRAME}?entry-transition=${Math.round(now)}`;
     entryScene.dataset.state = 'transition';
