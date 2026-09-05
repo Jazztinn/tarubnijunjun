@@ -3,6 +3,7 @@ const playfieldWrap = document.querySelector('.playfield-wrap');
 const gameWorld = document.querySelector('#game-world');
 const player = document.querySelector('#player');
 const entryScene = document.querySelector('#entry-scene');
+const entryChair = document.querySelector('#entry-chair');
 const cloudLayer = document.querySelector('.clouds');
 const foregroundCloudLayer = document.querySelector('.clouds-foreground');
 const shipSprite = document.querySelector('#ship-sprite');
@@ -370,6 +371,8 @@ function resetPlayer() {
   setPlayerPosition(playfield.clientWidth / 2, playfield.clientHeight - 70);
   entryScene.hidden = true;
   entryScene.dataset.state = 'hidden';
+  entryChair.hidden = true;
+  entryChair.dataset.state = 'hidden';
   player.style.opacity = '1';
   player.classList.remove('is-entry-preintro', 'is-entry-anticipating', 'is-entry-bracing', 'is-entry-relieved');
   player.style.removeProperty('--entry-preintro-size');
@@ -1984,6 +1987,9 @@ function retireEntrySceneWhenClear(phase) {
     entryScene.hidden = true;
     entryScene.removeAttribute('src');
     entryScene.dataset.state = 'retired';
+    entryChair.hidden = true;
+    entryChair.removeAttribute('src');
+    entryChair.dataset.state = 'retired';
   }
 }
 
@@ -2035,6 +2041,12 @@ function beginEntryCutscene(now) {
   entryScene.style.setProperty('--entry-preintro-size', `${ENTRY_PREINTRO_SIZE}px`);
   entryScene.style.left = `${finalX}px`;
   entryScene.style.top = `${entryCutscene.sceneY}px`;
+  entryChair.style.setProperty('--entry-preintro-size', `${ENTRY_PREINTRO_SIZE}px`);
+  entryChair.style.left = `${finalX}px`;
+  entryChair.style.top = `${entryCutscene.sceneY}px`;
+  entryChair.src = './public/assets/chairbehindtarub.png';
+  entryChair.dataset.state = 'active';
+  entryChair.hidden = false;
   entryScene.src = `${ENTRY_PREINTRO_GIF}?entry=${Math.round(now)}`;
   entryScene.dataset.state = 'preintro';
   entryScene.hidden = false;
@@ -2111,6 +2123,9 @@ function updateEntryCutscene(now, delta) {
         entryScene.hidden = true;
         entryScene.removeAttribute('src');
         entryScene.dataset.state = 'hidden';
+        entryChair.hidden = true;
+        entryChair.removeAttribute('src');
+        entryChair.dataset.state = 'hidden';
         player.classList.remove('is-entry-transitioning');
         player.classList.add('is-entry-relieved');
         setEntryPhase('freedom', now);

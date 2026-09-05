@@ -111,7 +111,9 @@ button { font: inherit; }
   height: var(--entry-preintro-size, 120px);
 }
 .entry-scene { position: absolute; z-index: 2; display: block; width: var(--entry-preintro-size, 120px); height: var(--entry-preintro-size, 120px); transform: translate(-50%, -50%); object-fit: contain; image-rendering: pixelated; pointer-events: none; }
+.entry-chair { position: absolute; z-index: 1; display: block; width: var(--entry-preintro-size, 120px); height: var(--entry-preintro-size, 120px); transform: translate(-50%, -50%); object-fit: contain; image-rendering: pixelated; pointer-events: none; }
 .entry-scene[hidden] { display: none; }
+.entry-chair[hidden] { display: none; }
 .player.is-entry-preintro .ship-sprite { visibility: hidden; }
 .player.is-entry-transitioning .ship-sprite { visibility: hidden; }
 .player.is-entry-relieved .ship-slot { animation: entry-relieved .72s steps(4, end) 2; }
