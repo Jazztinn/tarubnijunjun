@@ -2044,7 +2044,7 @@ function beginEntryCutscene(now) {
   entryScene.style.top = `${entryCutscene.sceneY}px`;
   entryChair.style.setProperty('--entry-preintro-size', `${ENTRY_PREINTRO_SIZE}px`);
   entryChair.style.left = `${finalX}px`;
-  entryChair.style.top = `${entryCutscene.sceneY}px`;
+  entryChair.style.top = `${entryCutscene.sceneY + 10}px`;
   entryChair.src = './public/assets/chairbehindtarub.png';
   entryChair.dataset.state = 'active';
   entryChair.hidden = false;
